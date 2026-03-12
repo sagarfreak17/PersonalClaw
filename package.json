@@ -1,0 +1,39 @@
+{
+  "name": "personalclaw",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dashboard": "npm run dev --prefix dashboard",
+    "all": "concurrently \"npm run dev\" \"npm run dashboard\"",
+    "start": "node dist/index.js",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "Sagar Kalra",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.4.0",
+    "@types/screenshot-desktop": "^1.15.0",
+    "@types/socket.io": "^3.0.1",
+    "concurrently": "^9.2.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@playwright/test": "^1.58.2",
+    "clipboardy": "^5.3.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "playwright": "^1.58.2",
+    "screenshot-desktop": "^1.15.3",
+    "socket.io": "^4.8.3",
+    "systeminformation": "^5.31.4",
+    "telegraf": "^4.16.3",
+    "tsx": "^4.21.0",
+    "ws": "^8.19.0"
+  }
+}

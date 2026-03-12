@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+dist/
+build/
+.env
+
+# Personal Data (Archives)
+memory/
+screenshots/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+.gemini/

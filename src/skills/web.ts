@@ -1,7 +1,8 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, BrowserContext, Page } from 'playwright';
 import { Skill } from '../types/skill.js';
+import * as path from 'path';
 
-let browser: Browser | null = null;
+let browser: BrowserContext | null = null;
 let page: Page | null = null;
 
 export const webSkill: Skill = {
@@ -12,8 +13,8 @@ export const webSkill: Skill = {
     properties: {
       action: {
         type: 'string',
-        enum: ['navigate', 'search', 'click', 'type', 'screenshot', 'extract_text'],
-        description: 'The action to perform on the web.',
+        enum: ['navigate', 'search', 'click', 'type', 'screenshot', 'extract_text', 'launch', 'close'],
+        description: 'The action to perform on the web. Use "launch" for a visible persistent browser, "close" to stop it.',
       },
       url: {
         type: 'string',
@@ -36,10 +37,25 @@ export const webSkill: Skill = {
   },
   run: async ({ action, url, query, selector, text }: { action: string; url?: string; query?: string; selector?: string; text?: string }) => {
     try {
+      if (action === 'launch' && browser) {
+        // If user explicitly asks for 'launch' and browser is hidden, restart it
+        await browser.close();
+        browser = null;
+      }
+
       if (!browser) {
-        browser = await chromium.launch({ headless: true });
-        const context = await browser.newContext();
-        page = await context.newPage();
+        // Use a permanent 'PersonalClaw' profile folder in the project root
+        // This acts exactly like a Chrome Profile (saves logins, bookmarks, history)
+        const userDataDir = path.join(process.cwd(), 'browser_data', 'PersonalClaw_Profile');
+        
+        console.log(`[Web] Launching persistent browser at ${userDataDir}...`);
+        browser = await chromium.launchPersistentContext(userDataDir, {
+          headless: action !== 'launch', 
+          viewport: null, // Open with natural window size
+          args: ['--start-maximized', '--no-sandbox']
+        }) as any;
+        
+        page = (browser as any).pages()[0] || await (browser as any).newPage();
       }
 
       if (!page) throw new Error("Could not initialize page");
@@ -49,6 +65,10 @@ export const webSkill: Skill = {
           if (!url) throw new Error("URL is required for navigate");
           await page.goto(url);
           return { success: true, currentUrl: page.url() };
+
+        case 'launch':
+          if (url) await page.goto(url);
+          return { success: true, message: "Visible browser launched with persistent session." };
 
         case 'search':
           if (!query) throw new Error("Query is required for search");
@@ -76,6 +96,14 @@ export const webSkill: Skill = {
           const screenshotPath = `screenshot_${Date.now()}.png`;
           await page.screenshot({ path: screenshotPath });
           return { success: true, path: screenshotPath };
+
+        case 'close':
+          if (browser) {
+            await browser.close();
+            browser = null;
+            return { success: true, message: "Browser closed." };
+          }
+          return { error: "No browser open." };
 
         default:
           return { success: false, error: 'Invalid web action' };

@@ -12,7 +12,8 @@ import {
   Sun,
   Moon,
   Camera,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -23,6 +24,7 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  image?: string;
 }
 
 const App: React.FC = () => {
@@ -34,6 +36,8 @@ const App: React.FC = () => {
   const [metrics, setMetrics] = useState({ cpu: 0, ram: '0', totalRam: '0' });
   const [isLightTheme, setIsLightTheme] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isBotTyping, setIsBotTyping] = useState(false);
+  const [pendingScreenshot, setPendingScreenshot] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,6 +49,7 @@ const App: React.FC = () => {
     });
 
     newSocket.on('response', (data: { text: string }) => {
+      setIsBotTyping(false);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text: data.text,
@@ -60,7 +65,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isBotTyping]);
 
   useEffect(() => {
     if (isLightTheme) {
@@ -71,18 +76,27 @@ const App: React.FC = () => {
   }, [isLightTheme]);
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !socket) return;
+    if ((!inputValue.trim() && !pendingScreenshot) || !socket) return;
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      text: inputValue,
+      text: inputValue || (pendingScreenshot ? '[Sent an image for analysis]' : ''),
       sender: 'user',
       timestamp: new Date(),
+      image: pendingScreenshot || undefined
     };
 
     setMessages(prev => [...prev, newMessage]);
-    socket.emit('message', { text: inputValue });
+    setIsBotTyping(true);
+    
+    // Send both text and optional image in one message
+    socket.emit('message', { 
+      text: inputValue || 'Analyze this image.', 
+      image: pendingScreenshot 
+    });
+
     setInputValue('');
+    setPendingScreenshot(null);
   };
 
   const handleScreenshot = async () => {
@@ -90,7 +104,6 @@ const App: React.FC = () => {
     setIsCapturing(true);
 
     try {
-      // Open the browser's native screen capture selection
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: "always" } as any,
         audio: false
@@ -106,8 +119,7 @@ const App: React.FC = () => {
         };
       });
 
-      // Give it a tiny moment to settle
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
 
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
@@ -116,20 +128,9 @@ const App: React.FC = () => {
       ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = canvas.toDataURL('image/png');
-      
-      // Stop all tracks
       stream.getTracks().forEach(track => track.stop());
 
-      // Send to backend
-      socket.emit('screenshot-capture', { image: imageData });
-      
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        text: '_[Dashboard Screenshot Captured]_',
-        sender: 'user',
-        timestamp: new Date()
-      }]);
-
+      setPendingScreenshot(imageData);
     } catch (err) {
       console.error('Screenshot failed:', err);
     } finally {
@@ -139,10 +140,8 @@ const App: React.FC = () => {
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <h1>PersonalClaw</h1>
-
         <nav style={{ flex: 1 }}>
           <ul style={{ listStyle: 'none' }}>
             <li className="nav-item active">
@@ -182,9 +181,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="main-content">
-        {/* Top Stats */}
         <div className="status-grid">
           <div className="stat-card">
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>CPU LOAD</div>
@@ -203,13 +200,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Chat Panel */}
         <div className="chat-panel">
           <div className="terminal-header">
             <div className="dot red" />
             <div className="dot yellow" />
             <div className="dot green" />
-            <span style={{ marginLeft: '12px', fontSize: '0.8rem', opacity: 0.6, fontFamily: 'monospace' }}>personal-claw-v1.0.0 --active</span>
+            <span style={{ marginLeft: '12px', fontSize: '0.8rem', opacity: 0.6, fontFamily: 'monospace' }}>personal-claw-v1.10.0 --active</span>
           </div>
 
           <div className="messages-container">
@@ -229,37 +225,76 @@ const App: React.FC = () => {
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.text}
                       </ReactMarkdown>
+                      {msg.image && (
+                        <img 
+                          src={msg.image} 
+                          alt="Uploaded content" 
+                          style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '10px', border: '1px solid var(--border)' }} 
+                        />
+                      )}
                     </div>
                   </div>
                 </motion.div>
               ))}
+              {isBotTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="message bot"
+                  style={{ background: 'transparent', border: 'none', padding: '0 20px' }}
+                >
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Bot size={18} />
+                    <div className="typing-indicator">
+                      <div className="typing-dot" />
+                      <div className="typing-dot" />
+                      <div className="typing-dot" />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="input-area" style={{ alignItems: 'flex-end' }}>
-            <textarea
-              placeholder="Ask PersonalClaw to do something..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-            />
-            <button 
-              className="screenshot-btn" 
-              onClick={handleScreenshot} 
-              disabled={isCapturing}
-              title="Capture System/Tab Screenshot"
-            >
-              {isCapturing ? <Loader2 size={20} className="spin" /> : <Camera size={20} />}
-            </button>
-            <button className="send-btn" onClick={handleSendMessage} style={{ height: '48px' }}>
-              <Send size={20} />
-            </button>
+          <div className="input-area-outer">
+            {pendingScreenshot && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="pending-preview"
+              >
+                <img src={pendingScreenshot} alt="Pending" />
+                <button className="remove-preview" onClick={() => setPendingScreenshot(null)}>
+                  <X size={14} />
+                </button>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: '10px' }}>Screenshot attached. Type your request and send.</span>
+              </motion.div>
+            )}
+            <div className="input-area" style={{ alignItems: 'flex-end' }}>
+              <textarea
+                placeholder="Ask PersonalClaw to do something..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+              />
+              <button 
+                className="screenshot-btn" 
+                onClick={handleScreenshot} 
+                disabled={isCapturing}
+                title="Capture Screenshot"
+              >
+                {isCapturing ? <Loader2 size={20} className="spin" /> : <Camera size={20} />}
+              </button>
+              <button className="send-btn" onClick={handleSendMessage} style={{ height: '48px' }}>
+                <Send size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -346,10 +381,66 @@ const App: React.FC = () => {
         .spin {
           animation: spin 1s linear infinite;
         }
+        .typing-indicator {
+          display: flex;
+          gap: 4px;
+          padding: 12px 16px;
+          background: var(--msg-bot-bg);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          border-bottom-left-radius: 4px;
+          width: fit-content;
+        }
+        .typing-dot {
+          width: 6px;
+          height: 6px;
+          background: var(--accent-primary);
+          border-radius: 50%;
+          animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+          40% { transform: translateY(-5px); opacity: 1; }
+        }
+        .input-area-outer {
+          background: rgba(0, 0, 0, 0.1);
+          border-top: 1px solid var(--border);
+        }
+        .pending-preview {
+          padding: 10px 20px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          position: relative;
+        }
+        .pending-preview img {
+          height: 50px;
+          width: 50px;
+          object-fit: cover;
+          border-radius: 8px;
+          border: 2px solid var(--accent-primary);
+        }
+        .remove-preview {
+          position: absolute;
+          top: 5px;
+          left: 55px;
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
       `}</style>
     </div>
   );
 };
 
 export default App;
-

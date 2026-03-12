@@ -9,6 +9,7 @@ import { TelegramInterface } from './interfaces/telegram.js';
 import si from 'systeminformation';
 import { WebSocketServer } from 'ws';
 import { setExtensionSocket, handleExtensionResponse } from './skills/relay.js';
+import { initScheduler } from './skills/index.js';
 
 dotenv.config();
 
@@ -47,6 +48,18 @@ const brain = new Brain();
 console.log('[Server] Initializing Telegram...');
 const telegram = new TelegramInterface(brain);
 
+console.log('[Server] Initializing Scheduler...');
+initScheduler(async (msg) => {
+  try {
+    const response = await brain.processMessage(msg);
+    io.emit('response', { text: response });
+    return response;
+  } catch (error) {
+    console.error('[Scheduler] Brain execution error:', error);
+    return `Error: ${error}`;
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Broadcaster for system metrics
@@ -68,39 +81,31 @@ setInterval(async () => {
 io.on('connection', (socket) => {
   console.log('[Server] Dashboard connected');
 
-  socket.on('message', async (data) => {
-    console.log('[Server] Received message from dashboard:', data);
+  socket.on('message', async (data: { text: string, image?: string }) => {
+    console.log('[Server] Received message from dashboard:', data.text);
     try {
-      const response = await brain.processMessage(data.text);
+      let finalPrompt = data.text;
+
+      if (data.image) {
+        console.log('[Server] Message contains an image. Saving...');
+        const base64Data = data.image.replace(/^data:image\/png;base64,/, "");
+        const screenshotsDir = path.join(process.cwd(), 'screenshots');
+        if (!fs.existsSync(screenshotsDir)) {
+          fs.mkdirSync(screenshotsDir, { recursive: true });
+        }
+        const filename = `dashboard_${Date.now()}.png`;
+        const filePath = path.join(screenshotsDir, filename);
+        fs.writeFileSync(filePath, base64Data, 'base64');
+        
+        finalPrompt = `[DASHBOARD_IMAGE_UPLOAD] User attached a screenshot saved to "${filePath}".\n\nUser Message: ${data.text}`;
+        console.log(`[Server] Screenshot saved to ${filePath}`);
+      }
+
+      const response = await brain.processMessage(finalPrompt);
       socket.emit('response', { text: response });
     } catch (error: any) {
       console.error('[Server] Brain error:', error);
       socket.emit('response', { text: `Error: ${error.message}` });
-    }
-  });
-
-  socket.on('screenshot-capture', async (data: { image: string }) => {
-    console.log('[Server] Received screenshot from dashboard');
-    try {
-      const base64Data = data.image.replace(/^data:image\/png;base64,/, "");
-      const screenshotsDir = path.join(process.cwd(), 'screenshots');
-      if (!fs.existsSync(screenshotsDir)) {
-        fs.mkdirSync(screenshotsDir, { recursive: true });
-      }
-      const filename = `dashboard_${Date.now()}.png`;
-      const filePath = path.join(screenshotsDir, filename);
-      fs.writeFileSync(filePath, base64Data, 'base64');
-
-      console.log(`[Server] Screenshot saved to ${filePath}`);
-      
-      // Notify the Brain about the new image
-      const internalPrompt = `[IMAGE_UPLOAD] A new screenshot has been captured from my dashboard and saved to "${filePath}". Please analyze it using analyze_vision and tell me what you see or ask me what to do with it.`;
-      const response = await brain.processMessage(internalPrompt);
-      socket.emit('response', { text: response });
-
-    } catch (error: any) {
-      console.error('[Server] Screenshot processing error:', error);
-      socket.emit('response', { text: `Failed to process screenshot: ${error.message}` });
     }
   });
 

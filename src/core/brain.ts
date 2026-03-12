@@ -32,8 +32,9 @@ Capabilities:
 - vision: Screen analysis using analyze_vision.
 - python: Script execution.
 - relay_browser_command: Control ACTIVE browser tabs. Use 'list' to see tabs, 'execute' for JS, or 'human_action' (with a JSON string code like {"action":"click", "selector":"#id"}) for realistic interactions like clicking and typing.
+- manage_scheduler: Schedule recurring tasks (cron jobs). Use actions "add", "list", or "remove".
 
-Guidelines: Use vision proactively when user asks about the screen. If you are unsure which tab is active or you are getting localhost/dashboard info, use relay_browser_command with action 'list' to find the correct tabId first.` }],
+Guidelines: Use vision proactively when user asks about the screen. For scheduling, use standard cron syntax (e.g., "0 * * * *" for hourly). If you are unsure which tab is active or you are getting localhost/dashboard info, use relay_browser_command with action 'list' to find the correct tabId first.` }],
     };
     
     this.history = [
@@ -78,9 +79,53 @@ Guidelines: Use vision proactively when user asks about the screen. If you are u
     return 'Brand new chat session initialized. A new memory file has been created.';
   }
 
-  async processMessage(message: string, onUpdate?: (chunk: string) => void) {
-    if (message.trim().toLowerCase() === '/new') {
+  async processMessage(message: string, onUpdate?: (chunk: string) => void): Promise<string> {
+    const msgLower = message.trim().toLowerCase();
+    
+    if (msgLower === '/new') {
       return await this.resetChat();
+    }
+
+    if (msgLower === '/cronjob') {
+      return await this.processMessage('Please list my current scheduled jobs and explain how I can add a new one.');
+    }
+
+    if (msgLower.startsWith('/browser')) {
+      const target = message.split(' ')[1] || '';
+      return await this.processMessage(`ACTION: Force Launch Visible Browser. URL: ${target}. Instruction: Use the browse_web tool with the "launch" action. This MUST open a visible browser window.`);
+    }
+
+    if (msgLower === '/close') {
+      return await this.processMessage('Please close the browser using the browse_web tool with the "close" action.');
+    }
+
+    if (msgLower === '/status') {
+      const history = await this.chat.getHistory();
+      const tokenResult = await model.countTokens({ contents: history });
+      const tokens = tokenResult.totalTokens;
+      const contextLimit = 1048576; // 1M tokens
+      const usagePercent = ((tokens / contextLimit) * 100).toFixed(2);
+      
+      const tools = getToolDefinitions().map((t: any) => t.functionDeclarations[0].name);
+      
+      return `📊 **PersonalClaw Status**:
+- **Session ID**: \`${this.sessionId}\`
+- **Model**: \`gemini-3-flash-preview\`
+- **Context Usage**: \`${tokens.toLocaleString()}\` / \`${contextLimit.toLocaleString()}\` tokens (**${usagePercent}%**)
+- **Turn Count**: \`${history.length}\` message turns
+- **Brain Mode**: \`Tool-Use / Reasoning\`
+- **Active Skills**: ${tools.map((t: string) => `\`${t}\``).join(', ')}
+- **Memory File**: \`memory/${this.sessionId}.json\``;
+    }
+
+    if (msgLower === '/help') {
+      return `🛸 **PersonalClaw Commands**:
+- \`/new\`: Start a fresh AI session.
+- \`/status\`: Check LLM session and context status.
+- \`/browser [url]\`: Launch a **visible**, persistent Chrome window.
+- \`/close\`: Close the active browser.
+- \`/cronjob\`: Manage your scheduled tasks.
+- \`/help\`: Show this menu.`;
     }
 
     console.log(`[Brain] Processing message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);

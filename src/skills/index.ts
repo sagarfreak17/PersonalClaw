@@ -5,6 +5,7 @@ import { webSkill } from './web.js';
 import { visionSkill } from './vision.js';
 import { clipboardSkill } from './clipboard.js';
 import { relaySkill } from './relay.js';
+import { schedulerSkill, initScheduler } from './scheduler.js';
 import { Skill } from '../types/skill.js';
 
 export const skills: Skill[] = [
@@ -15,7 +16,10 @@ export const skills: Skill[] = [
   visionSkill,
   clipboardSkill,
   relaySkill,
+  schedulerSkill,
 ];
+
+export { initScheduler };
 
 export const getToolDefinitions = () => {
   return skills.map(skill => ({

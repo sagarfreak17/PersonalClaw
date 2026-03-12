@@ -2,6 +2,26 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [1.10.0] - 2026-03-12
+### Added
+- **⌨️ Slash Commands**: Added quick-access commands:
+  - `/cronjob`: Lists active tasks and opens the scheduler guide.
+  - `/browser`: Launches a **visible** browser window.
+- **🌐 Persistent Browser**: Rebuilt the web engine to use `launchPersistentContext`. 
+  - Logins, cookies, and session data are now saved in `/browser_data`. 
+  - No more logging in every time you restart!
+
+---
+
+## [1.9.0] - 2026-03-12
+### Added
+- **⏰ Automated Task Scheduling**: Implemented a new `manage_scheduler` skill using `node-cron`.
+- **Persistent Jobs**: Scheduled tasks are saved to `memory/scheduled_jobs.json` and persist through server restarts.
+- **Smart Execution**: The scheduler can trigger any natural language command (e.g., "Take a screenshot and analyze it every Monday").
+- **Dashboard Feedback**: Active jobs broadcast their results to the dashboard so you can see them running in real-time.
+
+---
+
 ## [1.8.0] - 2026-03-12
 ### Added
 - **📸 Dashboard Vision**: Integrated a new "Camera" button in the web dashboard.

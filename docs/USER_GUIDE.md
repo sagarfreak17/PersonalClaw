@@ -1,4 +1,5 @@
 # PersonalClaw: End-User Guide 🛸
+**Developed by Sagar Kalra**
 
 ![PersonalClaw Logo](assets/logo.png)
 
@@ -61,12 +62,22 @@ Complete system control without touching the keyboard.
 Organize, read, and create files effortlessly.
 - **Ask**: *"Create a summary of my project notes"* or *"Move all .pdf files from Desktop to a new folder called Docs."*
 
+### ⏰ Automated Scheduling (Cron Jobs)
+PersonalClaw can now perform tasks on a schedule.
+- **Ask**: *"Schedule a job to check my email every morning at 9am"* or *"List my scheduled jobs."*
+- **Persistence**: Your jobs are saved to `\memory\scheduled_jobs.json` and will resume automatically even if you restart the server.
+
 ---
 
 ## 🛠️ Key Commands
 
 > [!IMPORTANT]
-> **`/new`**: Type this to start a completely fresh session. It clears the AI's short-term memory and starts a new log file in the `\memory` folder. Use this when switching tasks to save performance and tokens.
+> **`/new`**: Starts a fresh session (clears memory).
+> **`/status`**: Shows current session ID, context size, and loaded tools.
+> **`/cronjob`**: Lists and helps you manage your scheduled tasks.
+> **`/browser [url]`**: Launches a **visible** Chrome window with a persistent "PersonalClaw" profile (saves all your logins and history).
+> **`/close`**: Safely closes the automated browser.
+> **`/help`**: Shows all available commands.
 
 ---
 

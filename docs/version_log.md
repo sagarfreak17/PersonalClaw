@@ -4,6 +4,47 @@ All notable changes to the PersonalClaw agent will be documented in this file.
 
 ---
 
+## [1.16.0] - 2026-03-14
+### Added
+- **🔄 Model Failover Chain**: PersonalClaw now cascades through 5 models automatically on failure:
+  `gemini-3.1-pro-preview` → `gemini-3-flash-preview` → `gemini-2.5-pro` → `gemini-2.5-flash` → `gemini-3.1-flash-lite-preview`
+  - Handles: 404 (model not found), 503 (unavailable), rate limits (429), permission errors, and internal errors.
+  - Tracks failover history and displays it in `/status`.
+- **🤖 Model Registry**: Full model registry with metadata (tier, status, description, context window).
+- **📋 15 Slash Commands**: Massively expanded local command system:
+  - `/models` — View all models and the failover chain
+  - `/model <id>` — Hot-swap the active model mid-session (no context loss)
+  - `/memory` — View all stored long-term knowledge
+  - `/forget <key>` — Remove a specific memory entry
+  - `/skills` — List all loaded skills with descriptions
+  - `/jobs` — Show all scheduled cron jobs
+  - `/ping` — Quick health check
+  - `/export` — Export full session history to JSON
+  - `/screenshot` — Quick screen capture + analysis
+  - `/sysinfo` — Quick system info snapshot via PowerShell
+  - Unknown command handler with suggestions
+
+---
+
+## [1.15.0] - 2026-03-14
+### Changed
+- **🧠 Brain Overhaul**: Completely rebuilt the AI reasoning engine and system prompt from the ground up.
+  - **Identity & Personality**: PersonalClaw now has a defined personality — direct, efficient, technically sharp with dry humor.
+  - **Reasoning Framework**: Added structured 4-phase thinking model: Understand → Plan → Act → Verify.
+  - **Tool Usage Guides**: Each skill now has in-prompt best practices, tips, and anti-patterns to prevent wasteful calls.
+  - **Safety Guardrails**: Explicit rules preventing destructive commands without user confirmation, credential leaking, and rogue network requests.
+  - **Communication Rules**: Defined formatting, conciseness, and markdown standards for response quality.
+- **⚡ Context Window Management**: Added auto-compaction at 800k tokens — the brain now summarizes old history and rebuilds the session to avoid hitting the 1M limit.
+- **🔄 Memory-Aware Boot**: The system prompt now dynamically loads `long_term_knowledge.json` at session start, making learned preferences immediately available.
+- **🚀 Parallel Tool Execution**: Tool calls from the same turn are now executed concurrently via `Promise.all` instead of sequentially.
+- **📡 Live Tool Streaming**: Tool progress (success/failure + execution time) is now streamed to the UI via `onUpdate` during execution.
+- **🛠️ Configurable Model**: Model is now controlled via `GEMINI_MODEL` env var (defaults to `gemini-2.5-flash-preview-05-20`).
+- **📊 Enhanced /status**: Now shows turn count, token usage with percentage, and active model name.
+- **🗜️ /compact Command**: New slash command to manually trigger context compaction.
+- **🛡️ Error Recovery**: Added context overflow detection with automatic compaction retry, and richer error context passed back to the model.
+
+---
+
 ## [1.14.0] - 2026-03-14
 ### Changed
 - **🚀 Browser Streamlining**: Consolidated 3 competing browser systems (Playwright MCP, Stagehand, Relay Extension) into a single unified `browser` skill.

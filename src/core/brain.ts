@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getToolDefinitions, handleToolCall, skills } from '../skills/index.js';
+import { Learner } from './learner.js';
 
 dotenv.config();
 
@@ -108,7 +109,7 @@ function buildSystemPrompt(): string {
         .join('\n');
       if (entries) {
         knowledgeBlock = `
-## Learned User Knowledge (from long-term memory)
+## Learned User Knowledge (from manual memory)
 ${entries}
 Use this knowledge proactively. Adapt your tone, shortcuts, and workflow to match what you've learned.`;
       }
@@ -255,6 +256,7 @@ You are trained as a **Tier 3 MSP IT Technician**. When the user is working on I
 - If you're unsure whether an action is destructive, **ask first**.
 - If a PowerShell command could have system-wide side effects, explain what it will do before running it.
 ${knowledgeBlock}
+${Learner.buildContextBlock()}
 
 ---
 
@@ -263,7 +265,8 @@ ${knowledgeBlock}
 - If the user says something vague like "fix it" — recall the last context, ask ONE clarifying question if truly ambiguous, otherwise just handle it.
 - If a task requires multiple tool calls, batch them logically. Don't call tools one at a time when they could be parallelized mentally.
 - If you hit the tool turn limit, summarize what you've accomplished and what remains.
-- Remember: you are running **locally on Windows**. Paths use backslashes. PowerShell is your shell. The user controls this machine.`;
+- Remember: you are running **locally on Windows**. Paths use backslashes. PowerShell is your shell. The user controls this machine.
+- You are a self-learning agent. Your knowledge from past conversations is injected above. Use it naturally — don't tell the user you "learned" something unless they ask. Just be better.`;
 }
 
 // ─── Brain Class ─────────────────────────────────────────────────────
@@ -277,6 +280,7 @@ export class Brain {
   private failoverChain: string[];
   private failoverAttempts: Map<string, number> = new Map();
   private sessionStartTime: number;
+  private learner: Learner;
 
   constructor() {
     this.failoverChain = getFailoverChain();
@@ -284,6 +288,7 @@ export class Brain {
     this.model = this.createModel(this.activeModelId);
     this.sessionId = `session_${Date.now()}`;
     this.sessionStartTime = Date.now();
+    this.learner = new Learner();
     this.initSession();
     console.log(`[Brain] Initialized with model: ${this.activeModelId}`);
     console.log(`[Brain] Failover chain: ${this.failoverChain.join(' → ')}`);
@@ -515,6 +520,13 @@ export class Brain {
       `|---------|-------------|`,
       `| \`/screenshot\` | Capture and analyze the current screen |`,
       `| \`/sysinfo\` | Quick system snapshot (CPU, RAM, disk, network) |`,
+      ``,
+      `### 🧬 Self-Learning`,
+      `| Command | Description |`,
+      `|---------|-------------|`,
+      `| \`/learned\` | Show everything I've learned about you |`,
+      `| \`/learned log\` | View raw learning log |`,
+      `| \`/learned clear\` | Reset all self-learned data |`,
       ``,
       `---`,
       `**Tip**: Everything else — just talk naturally. I'll figure out the tools.`,
@@ -800,9 +812,14 @@ export class Brain {
       return await this.processMessage('Give me a quick system info snapshot: CPU, RAM, disk usage, OS version, IP address. Use PowerShell. Be concise.');
     }
 
+    // /learned — self-learning status
+    if (msgLower === '/learned') return Learner.getLearningSummary();
+    if (msgLower === '/learned log') return Learner.getLearningLog();
+    if (msgLower === '/learned clear') return Learner.clearLearnings();
+
     // Catch unknown slash commands
     if (msgLower.startsWith('/') && !msgLower.startsWith('/new') && !msgLower.includes(' ')) {
-      const known = ['/new', '/help', '/status', '/models', '/model', '/memory', '/forget', '/skills', '/jobs', '/compact', '/ping', '/export', '/screenshot', '/sysinfo'];
+      const known = ['/new', '/help', '/status', '/models', '/model', '/memory', '/forget', '/skills', '/jobs', '/compact', '/ping', '/export', '/screenshot', '/sysinfo', '/learned'];
       return `❓ Unknown command: \`${msgTrimmed}\`\n\nAvailable commands:\n${known.map(c => `\`${c}\``).join(' ')}`;
     }
 
@@ -899,6 +916,12 @@ export class Brain {
     // Save updated history
     this.history = await this.chat.getHistory();
     this.saveHistory();
+
+    // Queue conversation for background self-learning analysis
+    // Only for real user conversations, not internal scheduler messages
+    if (!message.startsWith('[INTERNAL_SCHEDULER]') && !message.startsWith('[DASHBOARD_IMAGE_UPLOAD]')) {
+      this.learner.queueAnalysis(this.history);
+    }
 
     if (onUpdate) onUpdate(finalTexts);
     return finalTexts || '(No response generated)';

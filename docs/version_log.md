@@ -4,6 +4,24 @@ All notable changes to the PersonalClaw agent will be documented in this file.
 
 ---
 
+## [1.17.0] - 2026-03-14
+### Added
+- **🧬 Self-Learning Engine**: PersonalClaw now passively learns from every conversation.
+  - **User Profile**: Auto-detects name, role, company, expertise level.
+  - **Communication Style**: Learns tone, verbosity, emoji usage, abbreviations/shorthand dictionary.
+  - **Intent Patterns**: Maps "when user says X, they mean Y" with confidence scores.
+  - **Workflow Patterns**: Remembers multi-step processes the user frequently performs.
+  - **Tool Preferences**: Learns which tools the user prefers and what to avoid.
+  - **Self-Correction**: Tracks mistakes and lessons to avoid repeating them.
+  - **Domain Knowledge**: Builds a dictionary of user-specific terms and jargon.
+  - Runs **fully asynchronous** using `gemini-2.5-flash` — never blocks user responses.
+  - All learned data persisted to `memory/self_learned.json`.
+  - Learning log tracked in `memory/learning_log.json`.
+- **📋 New Commands**: `/learned`, `/learned log`, `/learned clear` for self-learning visibility.
+- **🧠 Prompt Injection**: Learned knowledge is auto-injected into every system prompt — the AI gets smarter with every conversation.
+
+---
+
 ## [1.16.0] - 2026-03-14
 ### Added
 - **🔄 Model Failover Chain**: PersonalClaw now cascades through 5 models automatically on failure:

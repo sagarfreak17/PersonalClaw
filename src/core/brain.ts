@@ -5,6 +5,7 @@ import * as path from 'path';
 import { getToolDefinitions, handleToolCall, skills } from '../skills/index.js';
 import { chromeNativeAdapter, ChromeNativeAdapter } from './chrome-mcp.js';
 import { browserManager } from './browser.js';
+import { extensionRelay } from './relay.js';
 import { Learner } from './learner.js';
 import { eventBus, Events } from './events.js';
 import { audit } from './audit.js';
@@ -224,19 +225,22 @@ Before acting on non-trivial requests:
 - **manage_clipboard** — Read/write system clipboard.
 
 ### Browser & Web
-- **browser** — Dual-mode browser automation.
+- **browser** — Triple-mode browser automation.
 
   **Mode 1 — Playwright (default)**: Persistent Chromium with its own login profile.
-  **Mode 2 — Native Chrome (preferred for real-user tasks)**: Connected to the user's actual running
-  Chrome session. Uses Chrome 146+ native MCP server (SSE) or CDP fallback. Has all real logins,
-  cookies, and active tabs — no re-authentication needed.
+  **Mode 2 — Native Chrome (Chrome 146+)**: Connected to the user's actual running Chrome session
+  via Chrome MCP server (SSE) or CDP fallback. Has all real logins, cookies, and tabs.
+  **Mode 3 — Extension Relay**: The PersonalClaw Chrome extension bridges to the user's real
+  Chrome tabs via WebSocket. Rich DOM interaction — click, type, scrape with links/forms, scroll,
+  get interactive elements. No --remote-debugging-port needed — just install the extension.
 
-  **When to use native Chrome**: Any task involving the user's accounts, dashboards, or live data.
-  **How to connect**: use browser skill with action="connect_native" — auto-detects best mode (MCP > CDP).
-  **How to check**: use browser skill with action="status" — shows current mode and Chrome availability.
+  **Decision guide**:
+  - Extension connected? Use relay_ actions for real-tab interaction (relay_tabs, relay_scrape, relay_click, etc.).
+  - Need Chrome DevTools-level access? Use connect_native for CDP/MCP mode.
+  - Need clean isolated browser? Stay in Playwright mode.
+  - Check status first: use browser skill with action="status" to see all available modes.
 
   WORKFLOW: scrape first (cheap) → click/type → screenshot only if needed.
-  If task needs real logins → connect_native first.
 
 - **http_request** — Make HTTP requests (GET/POST/PUT/DELETE). For REST APIs, webhooks, data fetching.
 
@@ -255,7 +259,7 @@ Before acting on non-trivial requests:
 
 ## Tool Best Practices
 
-- **Browser**: Check status first if task involves user accounts. connect_native for real-session work. Scrape before screenshot.
+- **Browser**: Check status first to see available modes. Extension relay for real-tab work, connect_native for CDP/MCP, Playwright for isolation. Scrape before screenshot.
 - **PowerShell**: Prefer single-line pipelines. Write complex scripts to file first.
 - **HTTP**: Use for API integrations. Check response status codes.
 - **System Info**: Use specific actions (hardware, storage, etc.) — not overview for everything.
@@ -619,6 +623,7 @@ export class Brain {
       `| Command | Description |`,
       `|---------|-------------|`,
       `| \`/chrome [port]\` | Connect to real Chrome (native MCP/CDP, default port 9222) |`,
+      `| \`/relay\` | Show extension relay status and connected tabs |`,
       `| \`/screenshot\` | Capture and analyze the screen |`,
       `| \`/sysinfo\` | Quick system snapshot |`,
       `| \`/ip\` | Show IP addresses and network info |`,
@@ -1031,6 +1036,40 @@ export class Brain {
     return lines.join('\n');
   }
 
+  private handleRelay(): string {
+    const status = extensionRelay.getStatus();
+    const lines = [
+      `## Extension Relay`,
+      ``,
+      `| | |`,
+      `|---|---|`,
+      `| **Status** | ${status.connected ? 'Connected' : 'Disconnected'} |`,
+      `| **Endpoint** | ws://localhost:3000/relay |`,
+      `| **Open Tabs** | ${status.tabs} |`,
+    ];
+
+    if (status.connected && status.tabList.length > 0) {
+      lines.push(``, `### Tabs`);
+      lines.push(`| ID | Title | URL |`);
+      lines.push(`|----|-------|-----|`);
+      for (const tab of status.tabList.slice(0, 20)) {
+        const title = tab.title.substring(0, 40) + (tab.title.length > 40 ? '...' : '');
+        const url = tab.url.substring(0, 50) + (tab.url.length > 50 ? '...' : '');
+        const active = tab.active ? ' (active)' : '';
+        lines.push(`| ${tab.id} | ${title}${active} | ${url} |`);
+      }
+    }
+
+    if (!status.connected) {
+      lines.push(``, `### Setup`);
+      lines.push(`1. Load the extension from \`extension/\` folder in \`chrome://extensions\` (Developer Mode → Load Unpacked).`);
+      lines.push(`2. The extension auto-connects to \`ws://127.0.0.1:3000/relay\`.`);
+      lines.push(`3. Once connected, use \`relay_*\` browser actions to interact with your real Chrome tabs.`);
+    }
+
+    return lines.join('\n');
+  }
+
   private handleAudit(): string {
     const entries = audit.getRecent(20);
 
@@ -1089,6 +1128,7 @@ export class Brain {
     if (msgLower === '/export') return await this.handleExport();
     if (msgLower === '/perf') return this.handlePerf();
     if (msgLower === '/audit') return this.handleAudit();
+    if (msgLower === '/relay') return this.handleRelay();
     if (msgLower === '/sessions') return this.handleSessions();
 
     if (msgLower === '/chrome' || msgLower.startsWith('/chrome ')) {
@@ -1157,7 +1197,7 @@ export class Brain {
     // Unknown slash commands
     if (msgLower.startsWith('/') && !msgLower.startsWith('/new') && !msgLower.includes(' ')) {
       const known = ['/new', '/help', '/status', '/models', '/model', '/memory', '/forget', '/skills', '/jobs',
-        '/compact', '/ping', '/chrome', '/export', '/screenshot', '/sysinfo', '/learned', '/perf', '/audit',
+        '/compact', '/ping', '/chrome', '/relay', '/export', '/screenshot', '/sysinfo', '/learned', '/perf', '/audit',
         '/sessions', '/restore', '/search', '/ip', '/procs'];
       return `Unknown command: \`${msgTrimmed}\`\n\nAvailable commands:\n${known.map(c => `\`${c}\``).join(' ')}`;
     }

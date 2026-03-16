@@ -2,6 +2,60 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [10.3.0] - 2026-03-16
+
+### PersonalClaw Browser Relay Extension
+
+New Chrome MV3 extension that bridges PersonalClaw to the user's real Chrome tabs — no `--remote-debugging-port` flag needed.
+
+#### New: `extension/` — Chrome MV3 Extension
+- **`manifest.json`** — MV3 manifest with tabs, activeTab, scripting permissions.
+- **`background.js`** — Service worker maintaining WebSocket connection to `ws://127.0.0.1:3000/relay`. Handles tab management, navigation, screenshot capture via Chrome APIs. Auto-reconnects with heartbeat.
+- **`content.js`** — Injected on all pages. Rich DOM interaction: click (text/selector matching), type (character-by-character), scrape (text + links + forms + metadata), scroll, evaluate JS, get interactive elements, highlight. Visual indicator badge.
+- **`popup.html/popup.js`** — Connection status popup with configurable relay server URL.
+
+#### New: `src/core/relay.ts` — Extension Relay Server
+- **`ExtensionRelay`** class — WebSocket server attached to main HTTP server at `/relay` path. Manages extension connections, tab state, and command routing.
+- Promise-based command execution with timeout handling.
+- Convenience methods: `listTabs()`, `navigate()`, `click()`, `type()`, `scrape()`, `screenshot()`, `switchTab()`, `openTab()`, `closeTab()`, `evaluate()`, `scroll()`, `getElements()`, `highlight()`.
+- Singleton `extensionRelay` instance auto-started by the server.
+
+#### Changed: `src/skills/browser.ts`
+- 12 new relay actions: `relay_tabs`, `relay_navigate`, `relay_click`, `relay_type`, `relay_scrape`, `relay_screenshot`, `relay_switch_tab`, `relay_open_tab`, `relay_close_tab`, `relay_evaluate`, `relay_scroll`, `relay_elements`.
+- `tab_id` parameter for targeting specific Chrome tabs.
+- Updated skill description with three-mode decision guide.
+
+#### Changed: `src/core/brain.ts`
+- **`/relay`** slash command — shows extension connection status and open tabs list.
+- System prompt updated with Extension Relay mode documentation and decision guide.
+- `/relay` added to help table and known commands.
+
+#### Changed: `src/index.ts`
+- Extension relay attaches to main HTTP server at `/relay` WebSocket path.
+- Relay shutdown on graceful exit.
+- `GET /api/relay` REST endpoint for relay status.
+- Relay events in activity feed (connected, disconnected, tabs updated).
+- Startup banner shows relay WebSocket port.
+
+#### Changed: `src/core/events.ts`
+- New event constants: `RELAY_CONNECTED`, `RELAY_DISCONNECTED`, `RELAY_TABS_UPDATE`.
+
+#### How to Use
+```
+# 1. Load extension in Chrome:
+#    chrome://extensions → Developer Mode → Load Unpacked → select extension/ folder
+
+# 2. Extension auto-connects to PersonalClaw (ws://127.0.0.1:3000/relay)
+
+# 3. Check status:
+/relay
+
+# 4. Use relay actions in chat:
+# "List my open tabs"  → AI uses relay_tabs
+# "Scrape the active tab" → AI uses relay_scrape
+# "Click the Submit button" → AI uses relay_click
+```
+
 ## [10.2.1] - 2026-03-16
 
 ### Added

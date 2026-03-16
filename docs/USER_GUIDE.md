@@ -50,9 +50,13 @@ Wait a few seconds for both to initialize, then head to [http://localhost:5173](
 - **Security**: Locked to your specific Chat ID (Defined in your `.env`). No one else can command it.
 - **Usage**: Send text or photos from anywhere in the world to trigger your machine.
 
-### 3. Dual-Mode Browser (Built-in)
+### 3. Triple-Mode Browser (Built-in)
 - **Playwright Mode (default)**: Built-in persistent browser context. Navigates, scrapes, clicks, and types on any website. Logins saved in `browser_data/`.
-- **Native Chrome Mode (v10.2)**: Connect to your **real running Chrome** — all real logins, cookies, and active tabs. No re-authentication needed.
+- **Extension Relay Mode (v10.3)**: Install the **PersonalClaw Relay** Chrome extension to bridge the agent to your **real Chrome tabs**. No flags, no remote debugging — just install and go.
+  - **Setup**: `chrome://extensions` → Developer Mode → Load Unpacked → select the `extension/` folder.
+  - **Quick check**: `/relay` command shows connection status and open tabs.
+  - **Capabilities**: Full DOM interaction (click, type, scrape with links & forms), tab management, screenshots, JavaScript execution, scroll control, interactive element listing.
+- **Native Chrome Mode (v10.2)**: Connect to your **real running Chrome** via CDP or Chrome MCP.
   - **Quick connect**: `/chrome` command or ask the agent to connect.
   - **Requires**: Chrome launched with `--remote-debugging-port=9222`, or Chrome 146+ with remote debugging enabled in `chrome://inspect/#remote-debugging`.
   - **Chrome 146+**: Automatically enables Chrome's native MCP server, giving the AI direct access to Chrome DevTools tools.

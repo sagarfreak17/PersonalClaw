@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #16213e, #0f3460);
+      padding: 16px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+    .header .version {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .status-card {
+      margin: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .status-row:last-child { margin-bottom: 0; }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.connected { background: #4CAF50; box-shadow: 0 0 6px #4CAF50; }
+    .status-dot.disconnected { background: #F44336; }
+    .status-label {
+      font-size: 13px;
+      flex: 1;
+    }
+    .status-value {
+      font-size: 12px;
+      color: #aaa;
+      font-family: monospace;
+    }
+
+    .config {
+      margin: 0 12px 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .config label {
+      font-size: 11px;
+      color: #888;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .config input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    .config input:focus {
+      border-color: #4CAF50;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin: 0 12px 12px;
+    }
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+    .btn-primary:hover { background: #43A047; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #e0e0e0;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+    .footer {
+      text-align: center;
+      padding: 8px;
+      font-size: 10px;
+      color: #555;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>PersonalClaw Relay</h1>
+    <div class="version">v2.0.0 — Browser Bridge</div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-label" id="statusText">Checking...</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Server</span>
+      <span class="status-value" id="hostDisplay">—</span>
+    </div>
+  </div>
+
+  <div class="config">
+    <label>Relay Server URL</label>
+    <input type="text" id="hostInput" placeholder="ws://127.0.0.1:3000/relay" spellcheck="false">
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="connectBtn">Connect</button>
+    <button class="btn btn-secondary" id="reconnectBtn">Reconnect</button>
+  </div>
+
+  <div class="footer">
+    PersonalClaw &mdash; Your machine, your command.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

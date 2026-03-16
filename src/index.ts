@@ -11,6 +11,7 @@ import { audit } from './core/audit.js';
 import { SessionManager } from './core/sessions.js';
 import si from 'systeminformation';
 import { initScheduler, skills } from './skills/index.js';
+import { extensionRelay } from './core/relay.js';
 
 dotenv.config();
 
@@ -31,6 +32,9 @@ const brain = new Brain();
 
 console.log('[Server] Checking Telegram configuration...');
 const telegram = new TelegramInterface(brain);
+
+console.log('[Server] Attaching Extension Relay...');
+extensionRelay.attach(server);
 
 console.log('[Server] Initializing Scheduler...');
 initScheduler(async (msg) => {
@@ -87,6 +91,9 @@ function formatActivitySummary(event: any): string {
     case Events.DASHBOARD_DISCONNECTED: return `Dashboard disconnected`;
     case Events.SCHEDULER_FIRED: return `Scheduled task fired`;
     case Events.LEARNING_COMPLETED: return `Self-learning analysis completed`;
+    case Events.RELAY_CONNECTED: return `Extension relay connected`;
+    case Events.RELAY_DISCONNECTED: return `Extension relay disconnected`;
+    case Events.RELAY_TABS_UPDATE: return `Extension tabs updated (${event.data?.count || 0} tabs)`;
     default: return event.type;
   }
 }
@@ -262,6 +269,11 @@ app.get('/api/audit', (req, res) => {
   res.json(audit.getRecent(count, category));
 });
 
+// Extension relay status
+app.get('/api/relay', (req, res) => {
+  res.json(extensionRelay.getStatus());
+});
+
 // Activity feed
 app.get('/api/activity', (req, res) => {
   const count = parseInt(req.query.count as string) || 20;
@@ -273,6 +285,9 @@ const shutdown = async (signal: string) => {
   console.log(`\n[Server] ${signal} received. Shutting down gracefully...`);
 
   eventBus.dispatch(Events.SERVER_SHUTDOWN, { signal }, 'server');
+
+  // Stop extension relay
+  extensionRelay.stop();
 
   // Flush audit log
   audit.shutdown();
@@ -326,6 +341,7 @@ server.listen(PORT, () => {
     '  ║  Dashboard:  http://localhost:5173       ║',
     `  ║  Model:      ${brain.currentModel.padEnd(27)}║`,
     `  ║  Skills:     ${String(skills.length).padEnd(27)}║`,
+    `  ║  Relay:      ws://localhost:${PORT}/relay   ║`,
     '  ║  REST API:   /api/chat, /api/skills      ║',
     '  ╚══════════════════════════════════════════╝',
     '',

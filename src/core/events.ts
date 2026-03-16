@@ -96,4 +96,9 @@ export const Events = {
   LEARNING_STARTED: 'learning:started',
   LEARNING_COMPLETED: 'learning:completed',
   LEARNING_FAILED: 'learning:failed',
+
+  // Extension relay events
+  RELAY_CONNECTED: 'relay:extension_connected',
+  RELAY_DISCONNECTED: 'relay:extension_disconnected',
+  RELAY_TABS_UPDATE: 'relay:tabs_update',
 } as const;

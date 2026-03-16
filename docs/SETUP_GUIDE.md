@@ -50,9 +50,21 @@ If you prefer to do it manually:
 
 The agent has **built-in browser control** (Playwright) that works out of the box with its own persistent profile.
 
-### Native Chrome Connection (Recommended for v10.2+)
+### Extension Relay (Recommended — Easiest Setup)
 
-To let PersonalClaw control your **real Chrome session** (with all your logins and tabs):
+Install the **PersonalClaw Relay** Chrome extension to let the agent interact with your real Chrome tabs:
+
+1. Open `chrome://extensions` in Chrome.
+2. Enable **Developer Mode** (toggle in top-right).
+3. Click **Load Unpacked** and select the `extension/` folder from the PersonalClaw project.
+4. The extension auto-connects to PersonalClaw (you'll see a green "ON" badge).
+5. Type `/relay` in PersonalClaw chat to verify the connection.
+
+The agent can now list your tabs, click elements, type in forms, scrape content, take screenshots, and more — all on your real Chrome session.
+
+### Native Chrome Connection (Advanced — for v10.2+)
+
+For deeper Chrome DevTools-level access (CDP/MCP):
 
 **Option A — Launch Chrome with remote debugging:**
 ```

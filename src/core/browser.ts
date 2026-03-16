@@ -2,6 +2,7 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ChromeNativeAdapter, chromeNativeAdapter } from './chrome-mcp.js';
+import { extensionRelay } from './relay.js';
 
 const PROFILE_DIR = path.join(process.cwd(), 'browser_data', 'PersonalClaw_Profile');
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'screenshots');
@@ -284,20 +285,27 @@ export class BrowserManager {
   }
 
   /**
-   * Report the current browser mode and Chrome availability on default port.
+   * Report the current browser mode and Chrome/extension availability.
    */
   async getStatus(): Promise<{
     mode: string;
     port?: number;
     chromeAvailable?: { available: boolean; tabs: number; version: string };
+    extensionRelay?: { connected: boolean; tabs: number };
   }> {
     const nativeMode = chromeNativeAdapter.getMode();
+    const relayStatus = extensionRelay.getStatus();
+
     if (nativeMode !== 'disconnected') {
-      return { mode: nativeMode, port: chromeNativeAdapter.getPort() };
+      return { mode: nativeMode, port: chromeNativeAdapter.getPort(), extensionRelay: relayStatus };
+    }
+
+    if (relayStatus.connected) {
+      return { mode: 'extension-relay', extensionRelay: relayStatus };
     }
 
     const chromeAvailable = await ChromeNativeAdapter.probe();
-    return { mode: 'playwright-managed', chromeAvailable };
+    return { mode: 'playwright-managed', chromeAvailable, extensionRelay: relayStatus };
   }
 
   private async cleanup() {

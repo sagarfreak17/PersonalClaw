@@ -11,6 +11,8 @@ import { httpSkill } from './http.js';
 import { networkSkill } from './network.js';
 import { processManagerSkill } from './process-manager.js';
 import { systemInfoSkill } from './system-info.js';
+import { pdfSkill } from './pdf.js';
+import { imagegenSkill } from './imagegen.js';
 import { Skill } from '../types/skill.js';
 
 export const skills: Skill[] = [
@@ -27,6 +29,8 @@ export const skills: Skill[] = [
   networkSkill,
   processManagerSkill,
   systemInfoSkill,
+  pdfSkill,
+  imagegenSkill,
 ];
 
 export { initScheduler };

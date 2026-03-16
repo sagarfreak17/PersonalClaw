@@ -2,6 +2,33 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [10.4.0] - 2026-03-16
+
+### New Multi-Media Skills
+Implemented two powerful new skills for handling PDF documents and AI image generation.
+
+#### New: `src/skills/pdf.ts` — PDF Management
+- **`manage_pdf`** skill with 8 high-level actions:
+  - `extract_text` — Full text extraction via `pdfjs-dist`.
+  - `metadata` — Inspect title, author, page count, and version.
+  - `merge` — Combine multiple PDFs into a single file.
+  - `split` — Split PDFs by page ranges.
+  - `rotate` — Batch rotate pages (90/180/270 degrees).
+  - `watermark` — Add diagonal text watermarks with translucency.
+  - `create` — Generate new PDFs from plain text/markdown content.
+  - `extract_pages` — Slice specific pages into a new document.
+- Built using `pdf-lib` for modification and `pdfjs-dist` (v5) for extraction.
+
+#### New: `src/skills/imagegen.ts` — AI Image Generation
+- **`generate_image`** skill with dual-model intelligent fallback:
+  - **Imagen 3** (`imagen-3.0-generate-002`) — High-fidelity, photorealistic generations with support for aspect ratios (1:1, 16:9, etc.) and multiple variants.
+  - **Gemini 2.0 Flash** (`gemini-2.0-flash-preview-image-generation`) — Lightning-fast creative generations.
+- Features `auto` mode that attempts Imagen 3 first and falls back to Gemini Flash on any failure.
+- Auto-saves all generated images to the `outputs/` directory.
+
+#### Changed: `src/skills/index.ts`
+- Registered both `pdfSkill` and `imagegenSkill` into the global skill registry.
+
 ## [10.3.0] - 2026-03-16
 
 ### PersonalClaw Browser Relay Extension

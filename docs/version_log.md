@@ -2,6 +2,83 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [10.2.1] - 2026-03-16
+
+### Added
+- **`setup.bat`** — One-click automated setup. Installs all dependencies (brain, browser, dashboard) and interactively configures `.env` with API keys.
+- **`start.bat`** — One-click launcher for the entire system (Brain + Dashboard).
+- **Resilient Boot** — Improved startup logs and error handling for missing API keys or disabled Telegram interface.
+
+## [10.2.0] - 2026-03-16
+
+### Chrome Native MCP & Dual-Mode Browser
+
+PersonalClaw can now connect to the user's **real running Chrome session** — not a new instance, but the actual browser with all real logins, cookies, and active tabs.
+
+#### New: `src/core/chrome-mcp.ts`
+- **`ChromeNativeAdapter`** — connects to Chrome via two methods (auto-selects best):
+  1. **Chrome 146+ native MCP server** — SSE transport to Chrome's built-in DevTools MCP. Exposes Chrome's own tools directly to the brain (prefixed `chrome_*`).
+  2. **CDP fallback** — `chromium.connectOverCDP()` for any Chrome with remote debugging. Full Playwright API on the real session.
+- **`ChromeNativeAdapter.probe(port)`** — static check for Chrome availability without connecting.
+
+#### Changed: `src/core/browser.ts`
+- **`getPage()`** now prioritizes native Chrome CDP page when connected, falls back to Playwright.
+- **`connectNative(port?)`** — connect to real Chrome (delegates to `ChromeNativeAdapter`).
+- **`disconnectNative()`** — revert to Playwright-managed mode.
+- **`getStatus()`** — reports current mode and probes Chrome availability.
+
+#### Changed: `src/skills/browser.ts`
+- 4 new actions: `connect_native`, `disconnect_native`, `status`, `chrome_call`.
+- Updated skill description with decision guide (native Chrome vs Playwright).
+- `chrome_call` enables direct invocation of Chrome MCP tools by name.
+
+#### Changed: `src/core/brain.ts`
+- **Dynamic tool registration** — `createModel()` now includes Chrome MCP tools when connected.
+- **`refreshModel()`** — reloads Gemini model with updated tool definitions after connect/disconnect.
+- **`chrome_*` tool routing** — agentic loop routes Chrome MCP tool calls to `chromeNativeAdapter`.
+- **`/chrome [port]`** slash command — probes Chrome, connects, shows status. `/chrome disconnect` to revert.
+- **System prompt updated** — dual-mode browser explanation with decision rules for the AI.
+
+#### How to Use
+```
+/chrome              # connect to Chrome on port 9222
+/chrome 9229         # custom port
+/chrome disconnect   # back to Playwright
+
+# Or via browser skill:
+browser(action="connect_native")
+browser(action="status")
+browser(action="disconnect_native")
+```
+
+#### Prerequisites
+```
+# Option 1: Launch Chrome with remote debugging
+chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-debug
+
+# Option 2: Chrome 146+ auto-connection
+chrome://inspect/#remote-debugging → enable "Discover network targets"
+```
+
+---
+
+## [10.1.1] - 2026-03-16
+
+### Bug Fixes
+- **Browser Viewport**: Fixed the "fixed viewport" issue in the `BrowserManager`. By setting `viewport: null` and adding `--start-maximized`, the browser now scales naturally with the window size and provides a better interactive experience.
+
+---
+
+## [10.1.0] - 2026-03-15
+
+### 🧹 Codebase Cleanup
+- **Browser Consolidation**: Removed redundant `src/skills/relay.ts`, `src/skills/stagehand.ts`, and the `extension/` directory. Unified browser logic now resides in `src/skills/browser.ts`.
+- **Workspace Declutter**:
+  - Deleted obsolete root-level documentation exports (`PersonalClaw_Overview.md`, `PersonalClaw_Overview.pdf`, etc.) and temporary images.
+  - Relocated utility scripts (`check_ssl.ps1`, `list_models.js`, `test_vision.js`) from the project root to the `scripts/` directory for better organization.
+- **Persona Management**: Removed the unused `marketing` agent persona from `PaperClip/agents/`.
+- **Infrastructure**: Purged the `dist/` directory and temporary `browser_data/`.
+
 ---
 
 ## [10.0.0] - 2026-03-15

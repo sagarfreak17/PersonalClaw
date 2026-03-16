@@ -3,6 +3,8 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getToolDefinitions, handleToolCall, skills } from '../skills/index.js';
+import { chromeNativeAdapter, ChromeNativeAdapter } from './chrome-mcp.js';
+import { browserManager } from './browser.js';
 import { Learner } from './learner.js';
 import { eventBus, Events } from './events.js';
 import { audit } from './audit.js';
@@ -222,8 +224,20 @@ Before acting on non-trivial requests:
 - **manage_clipboard** — Read/write system clipboard.
 
 ### Browser & Web
-- **browser** — Unified browser automation with persistent login sessions.
+- **browser** — Dual-mode browser automation.
+
+  **Mode 1 — Playwright (default)**: Persistent Chromium with its own login profile.
+  **Mode 2 — Native Chrome (preferred for real-user tasks)**: Connected to the user's actual running
+  Chrome session. Uses Chrome 146+ native MCP server (SSE) or CDP fallback. Has all real logins,
+  cookies, and active tabs — no re-authentication needed.
+
+  **When to use native Chrome**: Any task involving the user's accounts, dashboards, or live data.
+  **How to connect**: use browser skill with action="connect_native" — auto-detects best mode (MCP > CDP).
+  **How to check**: use browser skill with action="status" — shows current mode and Chrome availability.
+
   WORKFLOW: scrape first (cheap) → click/type → screenshot only if needed.
+  If task needs real logins → connect_native first.
+
 - **http_request** — Make HTTP requests (GET/POST/PUT/DELETE). For REST APIs, webhooks, data fetching.
 
 ### System Intelligence
@@ -241,7 +255,7 @@ Before acting on non-trivial requests:
 
 ## Tool Best Practices
 
-- **Browser**: Always scrape first. Only screenshot when visual layout matters.
+- **Browser**: Check status first if task involves user accounts. connect_native for real-session work. Scrape before screenshot.
 - **PowerShell**: Prefer single-line pipelines. Write complex scripts to file first.
 - **HTTP**: Use for API integrations. Check response status codes.
 - **System Info**: Use specific actions (hardware, storage, etc.) — not overview for everything.
@@ -308,6 +322,11 @@ export class Brain {
   private totalToolCalls: number = 0;
 
   constructor() {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+      console.error('\n[CRITICAL] GEMINI_API_KEY is missing or invalid in .env!');
+      console.error('Please run setup.bat or manually update your .env file.\n');
+    }
+
     this.failoverChain = getFailoverChain();
     this.activeModelId = this.failoverChain[0];
     this.model = this.createModel(this.activeModelId);
@@ -328,10 +347,25 @@ export class Brain {
   }
 
   private createModel(modelId: string): GenerativeModel {
+    const tools = [
+      ...getToolDefinitions(),
+      // Dynamically include Chrome native MCP tools when connected (Chrome 146+)
+      ...chromeNativeAdapter.getGeminiToolDefs(),
+    ];
     return genAI.getGenerativeModel({
       model: modelId,
-      tools: getToolDefinitions() as any,
+      tools: tools as any,
     });
+  }
+
+  /**
+   * Refresh the Gemini model with current tool definitions.
+   * Call this after connecting/disconnecting from native Chrome to include Chrome MCP tools.
+   */
+  refreshModel(): void {
+    this.model = this.createModel(this.activeModelId);
+    this.chat = this.model.startChat({ history: this.history });
+    console.log('[Brain] Model refreshed with updated tool definitions.');
   }
 
   // ─── Getters for external access ──────────────────────────────────
@@ -584,6 +618,7 @@ export class Brain {
       `### Quick Actions`,
       `| Command | Description |`,
       `|---------|-------------|`,
+      `| \`/chrome [port]\` | Connect to real Chrome (native MCP/CDP, default port 9222) |`,
       `| \`/screenshot\` | Capture and analyze the screen |`,
       `| \`/sysinfo\` | Quick system snapshot |`,
       `| \`/ip\` | Show IP addresses and network info |`,
@@ -936,6 +971,66 @@ export class Brain {
     return lines.join('\n');
   }
 
+  private async handleChromeConnect(port: number): Promise<string> {
+    if (chromeNativeAdapter.isConnected()) {
+      const mode = chromeNativeAdapter.getMode();
+      const currentPort = chromeNativeAdapter.getPort();
+      return [
+        `## Native Chrome — Already Connected`,
+        ``,
+        `- **Mode**: \`${mode}\``,
+        `- **Port**: \`${currentPort}\``,
+        ``,
+        `All browser skill actions are operating on your real Chrome session.`,
+        `Disconnect: \`browser(action="disconnect_native")\``,
+      ].join('\n');
+    }
+
+    const probe = await ChromeNativeAdapter.probe(port);
+
+    if (!probe.available) {
+      return [
+        `## Native Chrome — Not Found on Port ${port}`,
+        ``,
+        `Chrome is not accessible at \`localhost:${port}\`.`,
+        ``,
+        `**To enable:**`,
+        `\`\`\``,
+        `# Option 1 — Launch Chrome with remote debugging:`,
+        `chrome.exe --remote-debugging-port=${port} --user-data-dir=%TEMP%\\chrome-debug`,
+        ``,
+        `# Option 2 — Enable in Chrome DevTools:`,
+        `chrome://inspect/#remote-debugging → Listen on localhost:${port}`,
+        `\`\`\``,
+        ``,
+        `Chrome 146+ automatically activates the native MCP server when remote debugging is enabled.`,
+      ].join('\n');
+    }
+
+    const result = await browserManager.connectNative(port);
+    this.refreshModel(); // Reload tool definitions to include Chrome MCP tools if available
+
+    const mode = chromeNativeAdapter.getMode();
+    const mcpTools = chromeNativeAdapter.getMCPToolNames();
+
+    const lines = [
+      `## Native Chrome Connected`,
+      ``,
+      `- **Mode**: \`${mode}\``,
+      `- **Port**: \`${port}\``,
+      `- **Chrome**: ${probe.version}`,
+      `- **Open tabs**: ${probe.tabs}`,
+    ];
+
+    if (mcpTools.length > 0) {
+      lines.push(`- **Chrome MCP tools**: ${mcpTools.length} (${mcpTools.slice(0, 5).join(', ')}${mcpTools.length > 5 ? '...' : ''})`);
+    }
+
+    lines.push(``, `All browser skill actions now operate on **your real Chrome session**. Real logins, real tabs, no re-authentication.`);
+
+    return lines.join('\n');
+  }
+
   private handleAudit(): string {
     const entries = audit.getRecent(20);
 
@@ -996,6 +1091,17 @@ export class Brain {
     if (msgLower === '/audit') return this.handleAudit();
     if (msgLower === '/sessions') return this.handleSessions();
 
+    if (msgLower === '/chrome' || msgLower.startsWith('/chrome ')) {
+      const arg = msgTrimmed.split(' ')[1]?.toLowerCase();
+      if (arg === 'disconnect' || arg === 'off') {
+        await browserManager.disconnectNative();
+        this.refreshModel();
+        return 'Disconnected from native Chrome. Back to Playwright mode.';
+      }
+      const port = arg ? parseInt(arg) || 9222 : 9222;
+      return await this.handleChromeConnect(port);
+    }
+
     if (msgLower === '/ping') {
       const uptimeMs = Date.now() - this.sessionStartTime;
       const uptimeMin = Math.floor(uptimeMs / 60000);
@@ -1051,8 +1157,8 @@ export class Brain {
     // Unknown slash commands
     if (msgLower.startsWith('/') && !msgLower.startsWith('/new') && !msgLower.includes(' ')) {
       const known = ['/new', '/help', '/status', '/models', '/model', '/memory', '/forget', '/skills', '/jobs',
-        '/compact', '/ping', '/export', '/screenshot', '/sysinfo', '/learned', '/perf', '/audit', '/sessions',
-        '/restore', '/search', '/ip', '/procs'];
+        '/compact', '/ping', '/chrome', '/export', '/screenshot', '/sysinfo', '/learned', '/perf', '/audit',
+        '/sessions', '/restore', '/search', '/ip', '/procs'];
       return `Unknown command: \`${msgTrimmed}\`\n\nAvailable commands:\n${known.map(c => `\`${c}\``).join(' ')}`;
     }
 
@@ -1101,7 +1207,10 @@ export class Brain {
         eventBus.dispatch(Events.TOOL_CALLED, { name, args }, 'brain');
 
         try {
-          const output = await handleToolCall(name, args);
+          // Route chrome_ prefixed tools to Chrome native MCP adapter
+          const output = chromeNativeAdapter.isChromeMCPTool(name)
+            ? await chromeNativeAdapter.executeChromeTool(name, args)
+            : await handleToolCall(name, args);
           const elapsed = Date.now() - startTime;
           console.log(`[Brain] ${name} completed in ${elapsed}ms`);
           toolCallsThisRequest++;

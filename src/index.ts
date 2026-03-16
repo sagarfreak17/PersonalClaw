@@ -29,7 +29,7 @@ console.log('[Server] Initializing PersonalClaw v10...');
 console.log('[Server] Initializing Brain...');
 const brain = new Brain();
 
-console.log('[Server] Initializing Telegram...');
+console.log('[Server] Checking Telegram configuration...');
 const telegram = new TelegramInterface(brain);
 
 console.log('[Server] Initializing Scheduler...');

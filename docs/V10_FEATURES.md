@@ -105,6 +105,50 @@ SessionManager.getStats(): SessionStats
 
 ---
 
+### 4. Chrome Native MCP Adapter (`src/core/chrome-mcp.ts`) — v10.2
+
+**What it does:** Connects PersonalClaw to the user's already-running Chrome browser — real logins, real tabs, no re-authentication.
+
+**Connection Modes (auto-selected, best wins):**
+
+| Mode | Chrome Version | Transport | What You Get |
+|------|---------------|-----------|-------------|
+| `chrome-mcp` | 146+ | SSE via MCP SDK | Chrome's own DevTools MCP tools exposed directly to the brain |
+| `cdp` | Any with remote debug | Playwright `connectOverCDP` | Full Playwright API on real Chrome |
+| `disconnected` | — | — | Default Playwright-managed Chromium |
+
+**Key Methods:**
+```typescript
+chromeNativeAdapter.connect(port?)        // Auto-selects best mode
+chromeNativeAdapter.disconnect()          // Revert to Playwright
+chromeNativeAdapter.getMode()             // 'chrome-mcp' | 'cdp' | 'disconnected'
+chromeNativeAdapter.getActivePage()       // CDP: returns Playwright Page
+chromeNativeAdapter.callMCPTool(name, args) // chrome-mcp: call Chrome's tools
+ChromeNativeAdapter.probe(port?)          // Static: check if Chrome is available
+```
+
+**Brain Integration:**
+- Chrome MCP tools dynamically registered with Gemini (prefixed `chrome_*`)
+- Agentic loop routes `chrome_*` calls to Chrome's native MCP server
+- `/chrome` slash command for quick connection
+- System prompt guides the AI on when to use native Chrome vs Playwright
+
+**Prerequisites:**
+```
+# Launch Chrome with remote debugging:
+chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-debug
+
+# Or Chrome 146+: chrome://inspect/#remote-debugging → enable listening
+```
+
+**Use Cases:**
+- Working with user's logged-in dashboards (email, CRM, ticketing systems)
+- Automating tasks on sites where re-login is impractical (MFA, SSO)
+- Interacting with the user's actual active tabs
+- IT support: navigating to admin panels that require existing sessions
+
+---
+
 ## 🚀 New Skills (4 additions)
 
 ### 1. HTTP Requests (`src/skills/http.ts`)
@@ -575,12 +619,14 @@ SessionManager.getStats(): SessionStats
 
 ### Commands Growth
 - v1.17: 15 slash commands
-- v10.0: 23 commands (+53%)
+- v10.0: 23 commands
+- v10.2: 24 commands (`/chrome` added)
 
 ### New Systems
 - Event Bus
 - Audit Logger
 - Session Manager
+- Chrome Native MCP Adapter (v10.2)
 
 ### API Endpoints
 - v1.17: 1 (GET /status)

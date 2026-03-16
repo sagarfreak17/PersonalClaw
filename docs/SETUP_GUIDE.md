@@ -25,34 +25,50 @@ git clone https://github.com/yourusername/PersonalClaw.git
 cd PersonalClaw
 ```
 
-### 2. Install Dependencies
-Install the Brain's dependencies and the Playwright browser:
+### 2. Automatic Setup (Recommended)
+Simply run the setup batch file. This will install all dependencies, configure your `.env` file, and prompt you for your API keys:
 ```bash
-npm install
-npx playwright install chromium
-```
-Install the Dashboard's dependencies:
-```bash
-cd dashboard
-npm install
-cd ..
+.\setup.bat
 ```
 
-### 3. Configure Environment Variables
-1. Rename `.env.example` to `.env`.
-2. Open `.env` and paste your `GEMINI_API_KEY`.
-3. (Optional) Add your Telegram Bot info.
+### 3. Running PersonalClaw
+Once setup is complete, you can launch both the Brain and the Dashboard with a single command:
+```bash
+.\start.bat
+```
+
+### 4. Manual Installation (Alternative)
+If you prefer to do it manually:
+1.  **Install Brain deps**: `npm install`
+2.  **Install Browser**: `npx playwright install chromium`
+3.  **Install Dashboard deps**: `cd dashboard && npm install && cd ..`
+4.  **Configure `.env`**: Rename `.env.example` to `.env` and add your keys.
 
 ---
 
-## 🖱️ Browser Setup (Optional Extension)
+## 🖱️ Browser Setup
 
-The agent now has **built-in browser control** that doesn't requires an extension. However, if you want the agent to interact with your *existing* open Chrome tabs:
-1. Open Chrome and go to `chrome://extensions`.
-2. Enable **Developer Mode** (top right toggle).
-3. Click **Load unpacked**.
-4. Select the `extension` folder inside your `PersonalClaw` directory.
-5. Click the circular "Refresh" icon on the extension card whenever you update the code.
+The agent has **built-in browser control** (Playwright) that works out of the box with its own persistent profile.
+
+### Native Chrome Connection (Recommended for v10.2+)
+
+To let PersonalClaw control your **real Chrome session** (with all your logins and tabs):
+
+**Option A — Launch Chrome with remote debugging:**
+```
+chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-debug
+```
+
+**Option B — Chrome 146+ auto-connection:**
+1. Open `chrome://inspect/#remote-debugging` in Chrome.
+2. Enable "Discover network targets" and add `localhost:9222`.
+3. Chrome's native MCP server activates automatically.
+
+**Then in PersonalClaw:**
+- Type `/chrome` in the chat, or
+- Ask the AI: *"connect to my Chrome"*
+
+All browser actions will now operate on your real Chrome session.
 
 ---
 

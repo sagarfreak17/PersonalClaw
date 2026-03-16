@@ -50,9 +50,12 @@ Wait a few seconds for both to initialize, then head to [http://localhost:5173](
 - **Security**: Locked to your specific Chat ID (Defined in your `.env`). No one else can command it.
 - **Usage**: Send text or photos from anywhere in the world to trigger your machine.
 
-### 3. Unified Browser (Built-in)
-- **Power**: The agent now features a built-in persistent browser context. It can navigate, scrape, click, and type on any website without needing your manual Chrome window to be open.
-- **Logins**: Your logins are saved automatically in `browser_data/`. You only need to log in once!
+### 3. Dual-Mode Browser (Built-in)
+- **Playwright Mode (default)**: Built-in persistent browser context. Navigates, scrapes, clicks, and types on any website. Logins saved in `browser_data/`.
+- **Native Chrome Mode (v10.2)**: Connect to your **real running Chrome** — all real logins, cookies, and active tabs. No re-authentication needed.
+  - **Quick connect**: `/chrome` command or ask the agent to connect.
+  - **Requires**: Chrome launched with `--remote-debugging-port=9222`, or Chrome 146+ with remote debugging enabled in `chrome://inspect/#remote-debugging`.
+  - **Chrome 146+**: Automatically enables Chrome's native MCP server, giving the AI direct access to Chrome DevTools tools.
 
 ---
 

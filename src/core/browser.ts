@@ -1,6 +1,7 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
+import { ChromeNativeAdapter, chromeNativeAdapter } from './chrome-mcp.js';
 
 const PROFILE_DIR = path.join(process.cwd(), 'browser_data', 'PersonalClaw_Profile');
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'screenshots');
@@ -18,20 +19,31 @@ export class BrowserManager {
   private initializing: Promise<void> | null = null;
 
   /**
-   * Get the active page, launching the browser if needed.
+   * Get the active page.
+   *
+   * Priority:
+   *   1. Native Chrome via CDP (real user session — preferred when connected)
+   *   2. Playwright-managed Chromium (persistent profile, fallback / default)
    */
   async getPage(): Promise<Page> {
-    // If already initializing, wait for it
+    // 1. Prefer real Chrome via CDP when connected
+    if (chromeNativeAdapter.getMode() === 'cdp') {
+      const nativePage = await chromeNativeAdapter.getActivePage();
+      if (nativePage && !nativePage.isClosed()) {
+        return nativePage;
+      }
+      // CDP page gone — fall through to Playwright
+    }
+
+    // 2. Playwright managed instance
     if (this.initializing) {
       await this.initializing;
     }
 
-    // If we have a valid page, return it
     if (this.page && !this.page.isClosed()) {
       return this.page;
     }
 
-    // Launch fresh
     this.initializing = this.launch();
     await this.initializing;
     this.initializing = null;
@@ -53,11 +65,12 @@ export class BrowserManager {
     // Use launchPersistentContext for login persistence across sessions
     this.context = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless: false,
-      viewport: { width: 1280, height: 900 },
+      viewport: null,
       args: [
         '--disable-blink-features=AutomationControlled',
         '--no-first-run',
         '--no-default-browser-check',
+        '--start-maximized',
       ],
     });
 
@@ -245,6 +258,46 @@ export class BrowserManager {
   async close(): Promise<string> {
     await this.cleanup();
     return 'Browser closed.';
+  }
+
+  // ─── Native Chrome Integration (Chrome 146+) ───────────────────────
+
+  /**
+   * Connect to the user's already-running Chrome session.
+   *
+   * Tries Chrome 146+ native MCP first, then CDP fallback.
+   * Once connected, all browser skill actions operate on the real Chrome.
+   *
+   * @param port  Chrome remote debugging port (default 9222)
+   */
+  async connectNative(port = 9222): Promise<string> {
+    const result = await chromeNativeAdapter.connect(port);
+    return result.message;
+  }
+
+  /**
+   * Disconnect from native Chrome and revert to Playwright-managed mode.
+   */
+  async disconnectNative(): Promise<string> {
+    await chromeNativeAdapter.disconnect();
+    return 'Disconnected from native Chrome. Back to Playwright-managed mode.';
+  }
+
+  /**
+   * Report the current browser mode and Chrome availability on default port.
+   */
+  async getStatus(): Promise<{
+    mode: string;
+    port?: number;
+    chromeAvailable?: { available: boolean; tabs: number; version: string };
+  }> {
+    const nativeMode = chromeNativeAdapter.getMode();
+    if (nativeMode !== 'disconnected') {
+      return { mode: nativeMode, port: chromeNativeAdapter.getPort() };
+    }
+
+    const chromeAvailable = await ChromeNativeAdapter.probe();
+    return { mode: 'playwright-managed', chromeAvailable };
   }
 
   private async cleanup() {

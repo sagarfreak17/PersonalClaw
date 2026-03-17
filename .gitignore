@@ -32,3 +32,6 @@ browser_data/
 test_vision.js
 list_models.js
 check_ssl.ps1
+
+# AI Generated Outputs
+outputs/

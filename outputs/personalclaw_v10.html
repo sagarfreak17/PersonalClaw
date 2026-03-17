@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PersonalClaw v10.0 | Autonomous Windows Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #050505; color: #a1a1aa; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .terminal-bg { background: rgba(10, 10, 10, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glow-text { text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+        .accent-border { border-left: 4px solid #3b82f6; }
+        .skill-card:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Navigation -->
+    <nav class="flex justify-between items-center p-6 border-b border-white/5 backdrop-blur-md sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">C</div>
+            <span class="text-white font-bold tracking-tighter text-xl mono">PersonalClaw <span class="text-blue-500">v10.0</span></span>
+        </div>
+        <div class="hidden md:flex gap-8 text-sm font-medium tracking-widest uppercase">
+            <a href="#logic" class="hover:text-white transition-colors">Logic</a>
+            <a href="#skills" class="hover:text-white transition-colors">Skills</a>
+            <a href="#msp" class="hover:text-white transition-colors">MSP Intel</a>
+        </div>
+        <div class="flex items-center gap-2 text-xs mono text-emerald-500">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            SYSTEM ONLINE
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="py-24 px-6 max-w-6xl mx-auto text-center">
+        <h1 class="text-6xl md:text-8xl font-black text-white tracking-tighter mb-6 glow-text">
+            NOT A CHATBOT.<br><span class="text-blue-500">AN OPERATOR.</span>
+        </h1>
+        <p class="text-xl md:text-2xl max-w-3xl mx-auto mb-10 leading-relaxed">
+            The state-of-the-art autonomous AI agent living locally on your Windows machine. 
+            I observe, reason, and act through deep system integration.
+        </p>
+        <div class="flex justify-center gap-4">
+            <div class="terminal-bg px-6 py-3 rounded-lg mono text-sm flex items-center gap-3">
+                <span class="text-slate-600">$</span> <span>personalclaw --mode autonomous</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Logic Section -->
+    <section id="logic" class="py-20 bg-[#080808] border-y border-white/5">
+        <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
+            <div>
+                <h2 class="text-3xl font-bold text-white mb-6 uppercase tracking-widest">Reasoning Framework</h2>
+                <div class="space-y-8">
+                    <div class="accent-border pl-6">
+                        <h3 class="text-white font-bold mb-2 uppercase">01. Understand</h3>
+                        <p class="text-sm">Parse the request. Identify ambiguity. Consult long-term memory.</p>
+                    </div>
+                    <div class="accent-border pl-6">
+                        <h3 class="text-white font-bold mb-2 uppercase">02. Plan</h3>
+                        <p class="text-sm">Sequence tool calls. Choose the cheapest path (Scrape > Vision).</p>
+                    </div>
+                    <div class="accent-border pl-6">
+                        <h3 class="text-white font-bold mb-2 uppercase">03. Act</h3>
+                        <p class="text-sm">Execute via PowerShell, Browser Relay, or Python scripts.</p>
+                    </div>
+                    <div class="accent-border pl-6">
+                        <h3 class="text-white font-bold mb-2 uppercase">04. Verify</h3>
+                        <p class="text-sm">Validate results. Report concisely. Own mistakes immediately.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl mono text-xs leading-loose overflow-hidden shadow-2xl">
+                <div class="flex gap-2 mb-4">
+                    <div class="w-3 h-3 rounded-full bg-red-500/50"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500/50"></div>
+                </div>
+                <div class="text-blue-400">// Running diagnostic on SRV-FS02...</div>
+                <div class="text-slate-500">[10:24:01] Hooking into Datto RMM Tab (ID: 1619839523)</div>
+                <div class="text-slate-500">[10:24:03] Scraping disk utilization metrics...</div>
+                <div class="text-emerald-400">[10:24:05] ALERT: E:\ Drive at 95.4% capacity.</div>
+                <div class="text-slate-500">[10:24:06] Generating cleanup candidate list via PowerShell...</div>
+                <div class="text-white mt-4 italic">"I've identified 42GB of stale shadow copies on FS02. Ready to purge?"</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Skills Grid -->
+    <section id="skills" class="py-24 px-6 max-w-6xl mx-auto">
+        <div class="flex justify-between items-end mb-12">
+            <div>
+                <h2 class="text-4xl font-black text-white uppercase italic">Toolbox</h2>
+                <p class="text-blue-500 mono text-sm">14 Core Skills | Native Execution</p>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-terminal text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">PowerShell Elite</h4>
+                <p class="text-sm">Full system access. Single-line pipelines. Registry, AD, and Service management.</p>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-globe text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">Triple-Mode Browser</h4>
+                <p class="text-sm">Playwright, Native Chrome, and Extension Relay for real-tab interaction.</p>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-brain text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">Long-Term Memory</h4>
+                <p class="text-sm">Self-learning agent. I remember your preferences, clients (SLG, NRP), and POCs.</p>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-network-wired text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">Net Diagnostics</h4>
+                <p class="text-sm">Trace, DNS, Port Checks, and ARP. Built for Tier 3 troubleshooting.</p>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-eye text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">Gemini Vision</h4>
+                <p class="text-sm">Visual analysis of your screen when text tools hit a dead end.</p>
+            </div>
+            <div class="terminal-bg p-6 rounded-xl skill-card border border-white/5 transition-all">
+                <i class="fas fa-file-pdf text-blue-500 mb-4 text-2xl"></i>
+                <h4 class="text-white font-bold mb-2">PDF Architect</h4>
+                <p class="text-sm">Generate, merge, and watermark professional reports and documentation.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- MSP Specialization -->
+    <section id="msp" class="py-24 px-6 bg-blue-600">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-white text-5xl font-black mb-6 tracking-tighter">MSP NATIVE</h2>
+            <p class="text-blue-100 text-xl mb-12">I speak your language. ITGlue, Meraki, ConnectWise, Datto, and Nilear are my natural habitat.</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <span class="bg-white/10 px-4 py-2 rounded text-white font-bold border border-white/20">ROOT CAUSE ANALYSIS</span>
+                <span class="bg-white/10 px-4 py-2 rounded text-white font-bold border border-white/20">READ-ONLY BY DEFAULT</span>
+                <span class="bg-white/10 px-4 py-2 rounded text-white font-bold border border-white/20">EVENT LOG MINING</span>
+                <span class="bg-white/10 px-4 py-2 rounded text-white font-bold border border-white/20">TICKET SUMMARIZATION</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 text-center border-t border-white/5">
+        <p class="mono text-xs uppercase tracking-widest">PersonalClaw v10.0 // Generated by Autonomous Process</p>
+    </footer>
+
+</body>
+</html>

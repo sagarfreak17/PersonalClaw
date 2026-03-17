@@ -2,6 +2,64 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [11.1.0] - 2026-03-17
+
+### Added
+- **Per-Chat Stop Buttons**: Each chat pane now has an independent **⬛ Stop** button.
+  - **Surgical Abort**: Instantly stops the primary brain's tool loop and kills all associated sub-agent workers for that specific chat window.
+  - **Context-Friendly**: Preserves conversation history; the chat window remains open and ready for the next message after stopping.
+  - **Backend Support**: New `Brain.resetAbort()`, `ConversationManager.abort()`, and `conversation:abort` socket event.
+  - **Activity Feed**: Abort actions are now logged to the activity feed as "Conversation aborted".
+
+### Fixed
+- **Stale Conversations**: Fixed "Conversation not found" error after server restarts by resyncing conversation IDs from the `init` socket event and re-requesting the list on reconnect.
+- **Agent Offline Indicator**: Fixed a regression where the "Agent" status showed "Offline" even when connected. Refactored `useConversations.ts` listeners to use named handlers for surgical cleanup, preserving unrelated listeners like the connectivity status.
+
+## [11.0.0] - 2026-03-17
+
+### Removed
+- **Paperclip AI** — entire integration removed. `src/skills/paperclip.ts`,
+  `PaperClip/` directory, `docs/PAPERCLIP_SOP.md`, `docs/PAPERCLIP_SKILL.md` deleted.
+  All references removed from brain, skill registry, and documentation.
+
+### Multi-Chat — 3 Independent Panes
+- Dashboard splits into up to 3 resizable chat panes via `react-resizable-panels`
+- Each pane has its own isolated `Brain` instance, conversation history, and input
+- Panes auto-numbered Chat 1 / Chat 2 / Chat 3 — label reused when pane is closed
+- `+` button opens new pane (hidden when 3 are open), `x` closes (hidden on last pane)
+- On close, conversation history auto-saved to SessionManager (retrievable via `/sessions`)
+- Dashboard reconnect syncs pane state; server restart starts fresh (sessions on disk)
+
+### Multi-Agent — 5 Sub-Agent Workers Per Pane
+- New `spawn_agent` skill — primary brains spawn up to 5 parallel workers per conversation
+- Workers: task string only, no history, no ability to spawn further agents
+- Worker overflow queues automatically, runs when a slot frees
+- Worker hard timeout: 5 minutes — resolves with error string, never crashes
+- Collapsible sub-agent side panel per pane — slides in from right on worker activity
+- Worker statuses: queued / running / waiting_for_lock / completed / failed / timed_out
+- Superuser raw log viewer: `Ctrl+Shift+D` toggles, View Logs on completed worker cards
+
+### Skill Lock System — Concurrent Resource Protection
+- New `src/core/skill-lock.ts` — ExclusiveLock + ReadWriteLock
+- Locks held per-execution only — acquired at run() entry, released in finally block
+- `browser` + `vision` share `browser_vision` exclusive lock (all 3 browser modes covered)
+- `clipboard` exclusive lock
+- `memory` + `scheduler` read-write locks
+- `files` + `pdf` per-path write locks
+- `waiting_for_lock` worker status with holder info shown in UI (amber pulsing dot)
+- `GET /api/locks` exposes current lock state
+
+### Infrastructure
+- `Brain` refactored from singleton to instantiable class
+- `SkillMeta` passed to every skill invocation (agentId, conversationId, conversationLabel, isWorker)
+- `src/core/telegram-brain.ts` — Telegram isolated Brain, outside ConversationManager
+- `POST /api/chat` preserved — routes to Chat 1, creates if needed
+- 6 new REST endpoints, 5 new socket events, 12 new Event Bus constants
+- Tool streaming re-wired via Event Bus (not onUpdate callback)
+- Graceful shutdown saves all open conversations before exit
+- Worker system prompt guardrail prevents destructive operations by autonomous agents
+- All 8 pre-build circular dependency and runtime issues resolved
+
 ## [10.4.1] - 2026-03-17
 
 ### Image Generation Enhancements
@@ -165,7 +223,7 @@ chrome://inspect/#remote-debugging → enable "Discover network targets"
 - **Workspace Declutter**:
   - Deleted obsolete root-level documentation exports (`PersonalClaw_Overview.md`, `PersonalClaw_Overview.pdf`, etc.) and temporary images.
   - Relocated utility scripts (`check_ssl.ps1`, `list_models.js`, `test_vision.js`) from the project root to the `scripts/` directory for better organization.
-- **Persona Management**: Removed the unused `marketing` agent persona from `PaperClip/agents/`.
+- **Persona Management**: Cleaned up unused agent personas.
 - **Infrastructure**: Purged the `dist/` directory and temporary `browser_data/`.
 
 ---
@@ -339,7 +397,7 @@ chrome://inspect/#remote-debugging → enable "Discover network targets"
 ## [1.13.0] - 2026-03-13
 ### Added
 - **🎭 Stagehand AI Browser**: Integrated `@browserbasehq/stagehand`, enabling high-level natural language browser automation ("act", "extract", "observe").
-- **🏢 Paperclip Orchestration**: Added `paperclip_orchestration` skill for autonomous company ticket management and task handling.
+
 - **🔄 Session Consistency**: Implemented singleton pattern for Stagehand and added **Independent Browser** support (`npm run browser`) so the browser window stays open even if the terminal/dashboard is closed.
 
 
@@ -357,7 +415,7 @@ chrome://inspect/#remote-debugging → enable "Discover network targets"
 ---
 
 ### Added
-- **🎭 Multi-Agent Orchestration**: Integrated **Paperclip AI**, enabling "Zero-Human Company" management directly within the PersonalClaw environment.
+
 - **🌐 Playwright MCP**: Replaced the legacy web skill with the full **Model Context Protocol (MCP)** server for Playwright, adding 22 granular browser automation tools.
 - **🚀 Dashboard Navigation**: Fixed side tabs with animated transitions. Added new dedicated views for **System Telemetry**, **File Explorer**, and **Security/Audit Logs**.
 - **📊 Context Radar**: Enhanced the `/status` command to show real-time **Token Usage** (against the 1M limit) and full session metrics.

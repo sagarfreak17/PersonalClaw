@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Brain } from './core/brain.js';
 import { TelegramInterface } from './interfaces/telegram.js';
 import { eventBus, Events } from './core/events.js';
 import { audit } from './core/audit.js';
@@ -12,6 +11,11 @@ import { SessionManager } from './core/sessions.js';
 import si from 'systeminformation';
 import { initScheduler, skills } from './skills/index.js';
 import { extensionRelay } from './core/relay.js';
+import { conversationManager } from './core/conversation-manager.js';
+import { agentRegistry } from './core/agent-registry.js';
+import { skillLock } from './core/skill-lock.js';
+// FIX-3: telegramBrain imported from neutral file, not declared here
+import { telegramBrain } from './core/telegram-brain.js';
 
 dotenv.config();
 
@@ -27,13 +31,10 @@ app.use('/outputs', express.static(path.join(process.cwd(), 'outputs')));
 app.use('/screenshots', express.static(path.join(process.cwd(), 'screenshots')));
 
 // ─── Core Initialization ────────────────────────────────────────────
-console.log('[Server] Initializing PersonalClaw v10...');
-
-console.log('[Server] Initializing Brain...');
-const brain = new Brain();
+console.log('[Server] Initializing PersonalClaw v11...');
 
 console.log('[Server] Checking Telegram configuration...');
-const telegram = new TelegramInterface(brain);
+const telegram = new TelegramInterface();
 
 console.log('[Server] Attaching Extension Relay...');
 extensionRelay.attach(server);
@@ -42,8 +43,10 @@ console.log('[Server] Initializing Scheduler...');
 initScheduler(async (msg) => {
   try {
     eventBus.dispatch(Events.SCHEDULER_FIRED, { command: msg }, 'scheduler');
-    const response = await brain.processMessage(msg);
-    io.emit('response', { text: response });
+    // Route scheduled tasks to Chat 1 (or create it)
+    const convo = conversationManager.getOrCreateDefault();
+    const response = await convo.brain.processMessage(msg);
+    io.emit('response', { conversationId: convo.id, text: response });
     return response;
   } catch (error) {
     console.error('[Scheduler] Brain execution error:', error);
@@ -54,12 +57,10 @@ initScheduler(async (msg) => {
 const PORT = process.env.PORT || 3000;
 
 // ─── Activity Feed ──────────────────────────────────────────────────
-// Broadcast events to all dashboards in real-time
 const activityBuffer: any[] = [];
 const MAX_ACTIVITY = 100;
 
 eventBus.on('*', (event) => {
-  // Skip noisy events
   if (event.type === Events.STREAMING_CHUNK) return;
 
   const activityItem = {
@@ -96,9 +97,58 @@ function formatActivitySummary(event: any): string {
     case Events.RELAY_CONNECTED: return `Extension relay connected`;
     case Events.RELAY_DISCONNECTED: return `Extension relay disconnected`;
     case Events.RELAY_TABS_UPDATE: return `Extension tabs updated (${event.data?.count || 0} tabs)`;
+    case Events.AGENT_WORKER_STARTED: return `Sub-agent started: ${event.data?.task?.substring(0, 60) || ''}`;
+    case Events.AGENT_WORKER_COMPLETED: return `Sub-agent completed`;
+    case Events.AGENT_WORKER_FAILED: return `Sub-agent failed: ${event.data?.error || ''}`;
+    case Events.AGENT_WORKER_TIMED_OUT: return `Sub-agent timed out`;
+    case Events.CONVERSATION_CREATED: return `Conversation created: ${event.data?.label || ''}`;
+    case Events.CONVERSATION_CLOSED: return `Conversation closed: ${event.data?.label || ''}`;
+    case Events.CONVERSATION_ABORTED: return `Conversation aborted: ${event.data?.label || ''}`;
     default: return event.type;
   }
 }
+
+// ─── FIX-6: Tool streaming re-wired via Event Bus ───────────────────
+// Forward primary brain tool events to dashboard (not worker events)
+eventBus.on('brain:tool_called', (event: any) => {
+  const data = event.data ?? event;
+  if (!data.isWorker) {
+    io.emit('tool_update', {
+      conversationId: data.conversationId,
+      type: 'started',
+      tool: data.name,
+      timestamp: Date.now(),
+    });
+  }
+});
+
+eventBus.on('brain:tool_completed', (event: any) => {
+  const data = event.data ?? event;
+  if (!data.isWorker) {
+    io.emit('tool_update', {
+      conversationId: data.conversationId,
+      type: 'completed',
+      tool: data.name,
+      durationMs: data.durationMs,
+      success: data.success,
+      timestamp: Date.now(),
+    });
+  }
+});
+
+// ─── Real-time agent status push ────────────────────────────────────
+const pushWorkerUpdate = (event: any) => {
+  const data = event.data ?? event;
+  io.emit('agent:update', {
+    conversationId: data.parentConversationId,
+    workers: agentRegistry.getWorkers(data.parentConversationId),
+  });
+};
+eventBus.on('agent:worker_started', pushWorkerUpdate);
+eventBus.on('agent:worker_completed', pushWorkerUpdate);
+eventBus.on('agent:worker_failed', pushWorkerUpdate);
+eventBus.on('agent:worker_timed_out', pushWorkerUpdate);
+eventBus.on('agent:worker_queued', pushWorkerUpdate);
 
 // ─── System Metrics Broadcaster ─────────────────────────────────────
 let cachedMetrics = { cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' };
@@ -134,26 +184,24 @@ io.on('connection', (socket) => {
 
   // Send initial state
   socket.emit('init', {
-    version: '10.0.0',
-    model: brain.currentModel,
-    sessionId: brain.currentSessionId,
+    version: '11.0.0',
     skills: skills.map(s => ({ name: s.name, description: s.description.split('\n')[0] })),
     metrics: cachedMetrics,
     activity: activityBuffer.slice(-20),
-    uptime: brain.uptime,
-    turns: brain.turns,
-    toolCalls: brain.toolCallCount,
+    conversations: conversationManager.list(),
   });
 
-  socket.on('message', async (data: { text: string, image?: string }) => {
-    console.log('[Server] Received message:', data.text?.substring(0, 100));
+  // ── Multi-chat message handler ──
+  socket.on('message', async (payload: { text: string; conversationId: string; image?: string }) => {
+    const { text, conversationId, image } = payload;
+    console.log(`[Server] Message for ${conversationId}:`, text?.substring(0, 100));
 
     try {
-      let finalPrompt = data.text;
+      let finalPrompt = text;
 
-      if (data.image) {
+      if (image) {
         console.log('[Server] Message contains an image. Saving...');
-        const base64Data = data.image.replace(/^data:image\/png;base64,/, "");
+        const base64Data = image.replace(/^data:image\/png;base64,/, "");
         const screenshotsDir = path.join(process.cwd(), 'screenshots');
         if (!fs.existsSync(screenshotsDir)) {
           fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -161,28 +209,64 @@ io.on('connection', (socket) => {
         const filename = `dashboard_${Date.now()}.png`;
         const filePath = path.join(screenshotsDir, filename);
         fs.writeFileSync(filePath, base64Data, 'base64');
-
-        finalPrompt = `[DASHBOARD_IMAGE_UPLOAD] User attached a screenshot saved to "${filePath}".\n\nUser Message: ${data.text}`;
-        console.log(`[Server] Screenshot saved to ${filePath}`);
+        finalPrompt = `[DASHBOARD_IMAGE_UPLOAD] User attached a screenshot saved to "${filePath}".\n\nUser Message: ${text}`;
       }
 
-      // Send tool updates in real-time
-      const response = await brain.processMessage(finalPrompt, (update) => {
-        socket.emit('tool_update', { text: update, timestamp: Date.now() });
-      });
-
+      const response = await conversationManager.send(conversationId, finalPrompt);
+      socket.emit('response', { conversationId, text: response });
+    } catch (err: any) {
       socket.emit('response', {
-        text: response,
-        metadata: {
-          model: brain.currentModel,
-          turns: brain.turns,
-          toolCalls: brain.toolCallCount,
-        },
+        conversationId, text: `Error: ${err.message}`, isError: true,
       });
-    } catch (error: any) {
-      console.error('[Server] Brain error:', error);
-      socket.emit('response', { text: `Error: ${error.message}` });
     }
+  });
+
+  // ── Conversation management ──
+  socket.on('conversation:create', () => {
+    try {
+      socket.emit('conversation:created', conversationManager.create());
+    } catch (err: any) {
+      socket.emit('conversation:error', { message: err.message });
+    }
+  });
+
+  socket.on('conversation:close', async ({ conversationId }: { conversationId: string }) => {
+    await conversationManager.close(conversationId);
+    socket.emit('conversation:closed', { conversationId });
+  });
+
+  socket.on('conversation:abort', ({ conversationId }: { conversationId: string }) => {
+    try {
+      conversationManager.abort(conversationId);
+      eventBus.dispatch(Events.CONVERSATION_ABORTED, { conversationId }, 'server');
+      // Send a synthetic "aborted" response so the frontend clears the waiting state
+      socket.emit('response', {
+        conversationId,
+        text: '⬛ Stopped. What\'s next?',
+        isAborted: true,
+      });
+    } catch (err: any) {
+      socket.emit('conversation:error', { message: err.message });
+    }
+  });
+
+  socket.on('conversation:list', () => {
+    socket.emit('conversation:list', conversationManager.list());
+  });
+
+  // ── Agent management ──
+  socket.on('agent:list', ({ conversationId }: { conversationId: string }) => {
+    socket.emit('agent:list', {
+      conversationId,
+      workers: agentRegistry.getWorkers(conversationId),
+    });
+  });
+
+  socket.on('agent:logs', ({ agentId }: { agentId: string }) => {
+    socket.emit('agent:logs', {
+      agentId,
+      logs: agentRegistry.getRawLogs(agentId),
+    });
   });
 
   socket.on('disconnect', () => {
@@ -197,36 +281,53 @@ io.on('connection', (socket) => {
 app.get('/status', (req, res) => {
   res.json({
     status: 'Online',
-    version: '10.0.0',
+    version: '11.0.0',
     system: 'PersonalClaw',
-    model: brain.currentModel,
-    session: brain.currentSessionId,
-    uptime: brain.uptime,
-    turns: brain.turns,
-    toolCalls: brain.toolCallCount,
+    skills: skills.length,
+    conversations: conversationManager.list().length,
   });
 });
 
-// Chat endpoint (REST)
+// Chat endpoint (REST) — routes to Chat 1, creates if not exists
 app.post('/api/chat', async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required.' });
     }
-
-    const response = await brain.processMessage(message);
-    res.json({
-      response,
-      metadata: {
-        model: brain.currentModel,
-        session: brain.currentSessionId,
-        turns: brain.turns,
-      },
-    });
+    const convo = conversationManager.getOrCreateDefault();
+    const response = await convo.brain.processMessage(message);
+    res.json({ response, conversationId: convo.id });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Conversation management
+app.post('/api/conversations', (req, res) => {
+  try { res.json(conversationManager.create()); }
+  catch (err: any) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/conversations', (req, res) => res.json(conversationManager.list()));
+
+app.delete('/api/conversations/:id', async (req, res) => {
+  await conversationManager.close(req.params.id);
+  res.json({ success: true });
+});
+
+// Agent management
+app.get('/api/conversations/:id/agents', (req, res) => {
+  res.json(agentRegistry.getWorkers(req.params.id));
+});
+
+app.get('/api/agents/:agentId/logs', (req, res) => {
+  res.json({ logs: agentRegistry.getRawLogs(req.params.agentId) });
+});
+
+// Lock status
+app.get('/api/locks', (req, res) => {
+  res.json(skillLock.getAllHeld());
 });
 
 // Skills list
@@ -252,11 +353,6 @@ app.get('/api/sessions/search', (req, res) => {
 
 app.get('/api/sessions/stats', (req, res) => {
   res.json(SessionManager.getStats());
-});
-
-// Performance stats
-app.get('/api/perf', (req, res) => {
-  res.json(brain.performanceStats);
 });
 
 // Metrics (instant)
@@ -287,6 +383,10 @@ const shutdown = async (signal: string) => {
   console.log(`\n[Server] ${signal} received. Shutting down gracefully...`);
 
   eventBus.dispatch(Events.SERVER_SHUTDOWN, { signal }, 'server');
+
+  // Save all open conversations
+  await conversationManager.closeAll();
+  // telegramBrain history is not saved — Telegram users reconnect fresh
 
   // Stop extension relay
   extensionRelay.stop();
@@ -337,14 +437,15 @@ server.listen(PORT, () => {
   const startupInfo = [
     '',
     '  ╔══════════════════════════════════════════╗',
-    '  ║       PersonalClaw v10.0  — Online       ║',
+    '  ║       PersonalClaw v11.0  — Online       ║',
     '  ╠══════════════════════════════════════════╣',
     `  ║  Backend:    http://localhost:${PORT}        ║`,
     '  ║  Dashboard:  http://localhost:5173       ║',
-    `  ║  Model:      ${brain.currentModel.padEnd(27)}║`,
     `  ║  Skills:     ${String(skills.length).padEnd(27)}║`,
     `  ║  Relay:      ws://localhost:${PORT}/relay   ║`,
     '  ║  REST API:   /api/chat, /api/skills      ║',
+    '  ║  Multi-Chat: Up to 3 panes              ║',
+    '  ║  Sub-Agents: Up to 5 per pane           ║',
     '  ╚══════════════════════════════════════════╝',
     '',
   ];
@@ -352,7 +453,6 @@ server.listen(PORT, () => {
 
   eventBus.dispatch(Events.SERVER_STARTED, {
     port: PORT,
-    model: brain.currentModel,
     skills: skills.length,
   }, 'server');
 });

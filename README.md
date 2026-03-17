@@ -1,49 +1,52 @@
-# PersonalClaw v10.0 🛸
+# PersonalClaw v11.0 🛸
 
 **The next-generation Windows AI agent. Local. Private. Unstoppable.**
 
 PersonalClaw is a sophisticated, locally-hosted AI agent that combines Google Gemini with full system access, autonomous task execution, and intelligent learning. It's your digital hands—capable of system administration, automation, analytics, and real-time decision-making.
 
-![PersonalClaw v10](docs/assets/logo.png)
+![PersonalClaw v11](docs/assets/logo.png)
 
 **Developed by Sagar Kalra**
 
 ---
 
-## ✨ v10 Game-Changing Features
+## ✨ v11.0 — Multi-Agent Architecture
 
-### 🎯 Infrastructure
-- **Event Bus** — Central nervous system. All subsystems communicate via typed events.
-- **Audit Logger** — Every action logged (tools, errors, failovers) with rotation
-- **Session Manager** — Full-text search past conversations, restore any session
-- **REST API** — 9 endpoints for external integrations (`/api/chat`, `/api/perf`, `/api/audit`, etc.)
+### 🧩 Multi-Chat Workspace (3 Panes)
+- **Up to 3 independent chat panes** — each with its own isolated Brain instance
+- **Resizable panels** — drag to resize, auto-numbered Chat 1 / Chat 2 / Chat 3
+- **Auto-save on close** — conversation history persisted to SessionManager
+- **`+` button** to open new panes, `x` to close (reuses labels)
 
-### 🚀 New Skills (4 additions = 13 total)
-1. **HTTP Requests** — REST API calls, webhooks, data fetching with auth & response handling
-2. **Network Diagnostics** — ping, traceroute, DNS, port scans, connections, ARP, routing
-3. **Process Manager** — List, kill, start, stop processes and Windows services
-4. **Deep System Info** — Hardware, software, storage, drivers, security, events, battery
+### 🤖 Sub-Agent Workers (5 per Pane)
+- **`spawn_agent` skill** — primary brains spawn parallel workers for independent tasks
+- **Worker constraints** — no history, no further spawning, destructive-ops guardrail
+- **Real-time status** — queued / running / waiting_for_lock / completed / failed / timed_out
+- **Collapsible side panel** — auto-opens on worker activity, closes after completion
+- **Superuser mode (Ctrl+Shift+D)** — raw log viewer on completed worker cards
 
-### 🧠 Brain Enhancements
-- **Performance Tracking** — Response times, P50/P95 latency, tool usage analytics
-- **8 New Slash Commands** — `/perf`, `/audit`, `/sessions`, `/restore`, `/search`, `/ip`, `/procs`
-- **Session Restore** — Load previous conversations by ID
-- **Full-Text Search** — Find relevant past conversations instantly
+### 🔒 Skill Lock System
+- **Exclusive locks** — `browser` + `vision` share `browser_vision` lock; `clipboard` exclusive
+- **Read-write locks** — `memory`, `scheduler` allow concurrent reads, exclusive writes
+- **Per-path locks** — `files` and `pdf` lock by output file path
+- **Lock UI** — `waiting_for_lock` status with amber indicator showing holder info
+- **`GET /api/locks`** — inspect current lock state
 
-### 🎨 Dashboard Overhaul
-- **Command Palette (Ctrl+K)** — 17 quick commands searchable
-- **Activity Feed** — Real-time event stream in dedicated tab
-- **Tool Progress** — See which tools are running, execution times
-- **Toast Notifications** — Connection status alerts
-- **Sparkline Charts** — Mini CPU/RAM trend graphs
-- **Command History** — Arrow Up/Down cycles through past messages
-- **Modern UX** — Redesigned nav, improved code blocks, responsive layout
+### 🏗️ Infrastructure
+- **Brain refactored** — singleton to instantiable class with `BrainConfig`
+- **`SkillMeta`** passed to every skill (agentId, conversationId, conversationLabel, isWorker)
+- **Telegram Brain** — isolated instance, outside conversation manager
+- **15 skills** — 14 original + `spawn_agent`
+- **6 new REST endpoints** + 5 new socket events + 12 Event Bus constants
+- **Tool streaming** re-wired via Event Bus
+- **Graceful shutdown** saves all open conversations
 
-### 📊 Improvements
-- **Zero Build Errors** — Full strict TypeScript
-- **Graceful Shutdown** — SIGINT/SIGTERM handlers
-- **Real-Time Metrics** — Disk usage now tracked
-- **Activity Broadcasting** — Events stream to all dashboards
+### 📊 Previous (v10) Features Still Included
+- Event Bus, Audit Logger, Session Manager, REST API
+- HTTP Requests, Network Diagnostics, Process Manager, Deep System Info
+- Performance Tracking, 23 Slash Commands, Session Restore, Full-Text Search
+- Command Palette (Ctrl+K), Activity Feed, Tool Progress, Sparkline Charts
+- PDF Management, AI Image Generation, Browser Extension Relay, Native Chrome
 
 ---
 
@@ -121,7 +124,7 @@ Open [http://localhost:5173](http://localhost:5173)
 - **Backend** — Express + Socket.io + Gemini API with failover chain
 - **Frontend** — React 19 + Vite + Framer Motion
 - **Event Bus** — Publish/subscribe for all subsystems
-- **Skills** — 13 pluggable tool modules
+- **Skills** — 14 pluggable tool modules
 - **Memory** — Session history, long-term knowledge, audit logs, learning data
 
 ---
@@ -131,7 +134,7 @@ Open [http://localhost:5173](http://localhost:5173)
 - **[USER_GUIDE.md](docs/USER_GUIDE.md)** — End-user walkthrough and tips
 - **[SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — Installation & configuration
 - **[VERSION_LOG.md](docs/version_log.md)** — Complete version history (v1 → v10)
-- **[AGENTS.md](AGENTS.md)** — Paperclip multi-agent integration
+- **[AGENTS.md](AGENTS.md)** — Agent operating instructions and guidelines
 
 ---
 
@@ -148,7 +151,7 @@ Open [http://localhost:5173](http://localhost:5173)
 
 | Metric | Value |
 |--------|-------|
-| **Skills** | 13 |
+| **Skills** | 14 |
 | **Commands** | 23 |
 | **Models** | 5 (with failover) |
 | **Max Tokens** | 1M |

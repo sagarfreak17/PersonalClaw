@@ -6,7 +6,7 @@
  */
 
 import axios from 'axios';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 export const httpSkill: Skill = {
   name: 'http_request',
@@ -52,7 +52,7 @@ Returns: status code, headers, and response body (truncated to 10KB).`,
     headers?: string;
     body?: string;
     timeout?: number;
-  }) => {
+  }, _meta: SkillMeta) => {
     try {
       // Parse headers if provided
       let parsedHeaders: Record<string, string> = {};

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Loader2, X, Paperclip } from 'lucide-react';
+import { Send, Camera, Loader2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ChatInputProps {

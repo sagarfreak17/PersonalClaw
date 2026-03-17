@@ -1,8 +1,10 @@
-# PersonalClaw v10.0: Complete Feature Guide 🚀
+# PersonalClaw v10.0: Feature Guide (Legacy Reference) 🚀
+
+> **Note:** This document covers v10.0 features. For v11.0 multi-chat, multi-agent, and skill lock features, see `version_log.md` and `USER_GUIDE.md`.
 
 ## Overview
 
-v10.0 represents a fundamental leap forward—from a capable assistant to a production-grade autonomous agent. This document covers every new system, skill, and feature.
+v10.0 represents a fundamental leap forward—from a capable assistant to a production-grade autonomous agent. This document covers every system, skill, and feature introduced in v10.
 
 ---
 
@@ -615,7 +617,7 @@ chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-debug
 
 ### Skills Growth
 - v1.17: 9 skills
-- v10.0: 13 skills (+44%)
+- v10.0: 14 skills (+55%)
 
 ### Commands Growth
 - v1.17: 15 slash commands

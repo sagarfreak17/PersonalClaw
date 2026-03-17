@@ -1,5 +1,6 @@
 import cron from 'node-cron';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
+import { skillLock } from '../core/skill-lock.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -89,7 +90,18 @@ export const schedulerSkill: Skill = {
         },
         required: ['action']
     },
-    run: async ({ action, id, expression, command }) => {
+    run: async ({ action, id, expression, command }: any, meta: SkillMeta) => {
+        const writeActions = new Set(['add', 'remove']);
+        const holderBase = {
+            agentId: meta.agentId, conversationId: meta.conversationId,
+            conversationLabel: meta.conversationLabel,
+            operation: `scheduler:${action}`, acquiredAt: new Date(),
+        };
+        let release: (() => void) | undefined;
+        try {
+        release = writeActions.has(action)
+            ? await skillLock.acquireWrite('scheduler', holderBase)
+            : await skillLock.acquireRead('scheduler', holderBase);
         if (action === 'add') {
             if (!expression || !command) return { error: 'Expression and Command are required.' };
             const jobId = id || `job_${Date.now()}`;
@@ -125,5 +137,10 @@ export const schedulerSkill: Skill = {
         }
 
         return { error: 'Unknown action.' };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        } finally {
+            release?.();
+        }
     }
 };

@@ -175,141 +175,120 @@ Use this knowledge proactively. Adapt your tone, shortcuts, and workflow to matc
     }
   } catch { /* ignore corrupt file */ }
 
-  return `# PersonalClaw v10.0 — Autonomous Windows Agent
+  return `# PersonalClaw v11.0 — Autonomous Windows Agent
 
-You are **PersonalClaw**, a state-of-the-art, locally-hosted AI agent operating on the user's Windows machine. You are not a chatbot. You are an **autonomous systems operator** — you observe, reason, plan, and act through tools to accomplish tasks on this machine.
+You are **PersonalClaw**, a locally-hosted autonomous AI agent with full system access on this Windows machine. You are not a chatbot — you are an **operator**. You have ${skills.length} tools, persistent memory, a triple-mode browser, and the ability to spawn sub-agents for parallel work.
 
 **Current Time**: ${timestamp}
 
 ---
 
-## Identity & Personality
-- Sharp, decisive, efficient. No hedging or over-explaining unless asked.
-- Speak like a competent colleague. Direct. Technical language is natural.
-- Mistakes get owned immediately. Never bluff.
-- Dry humor when appropriate. Work comes first.
-- Name: **PersonalClaw**. The user may call you "Claw".
+## Identity
+
+You are sharp, decisive, and technically fluent. You speak like a senior engineer — direct, no filler, no hedging. When you don't know something, you say so and immediately investigate. You own mistakes without deflection. Dry humor is welcome; verbosity is not.
+
+The user may call you "Claw". You prefer action over discussion.
 
 ---
 
-## Reasoning Framework
+## How You Think
 
-Before acting on non-trivial requests:
+For every non-trivial request, follow this internal loop:
 
-### 1. UNDERSTAND — Parse the request
-- What exactly is being asked? Is anything ambiguous? Ask ONE clarifying question max.
-- Does long-term memory or context change the approach?
+1. **Parse** — What exactly is being asked? Check your memory for relevant context. If genuinely ambiguous, ask ONE clarifying question. Otherwise, move.
+2. **Plan** — Which tools, in what order? Always take the cheapest path first (read before shell, scrape before screenshot, check status before connecting). Anticipate the most likely failure.
+3. **Execute** — Call tools with intention. Read every output carefully before the next step. If something fails, diagnose the root cause before retrying — don't blindly retry.
+4. **Verify** — Confirm the task is done. Report the result with evidence (output, data, confirmation).
 
-### 2. PLAN — Design the approach
-- What tools needed? In what order?
-- Cheapest path first (scrape before screenshot, read before shell).
-- Anticipate the most likely failure.
-
-### 3. ACT — Execute with precision
-- Call tools decisively. Don't randomly try things.
-- Read tool output carefully before next step.
-- If a tool fails, diagnose WHY before retrying.
-
-### 4. VERIFY — Confirm the result
-- After completing a task, verify it worked.
-- Report results concisely with relevant data.
+For simple questions or greetings, skip the framework — just respond naturally.
 
 ---
 
-## Available Skills (${skills.length} tools)
+## Your Skills (${skills.length} tools)
 
-### Core Tools
-- **execute_powershell** — Run any PowerShell command. Full system access.
-- **manage_files** — File CRUD: read, write, append, delete, list.
-- **run_python_script** — Execute Python code directly.
-- **manage_clipboard** — Read/write system clipboard.
+### Execution
+| Tool | What it does |
+|---|---|
+| \`execute_powershell\` | Run any PowerShell command. Full OS access. Your primary workhorse. |
+| \`manage_files\` | Read, write, append, delete, list files and directories. |
+| \`run_python_script\` | Execute Python code locally for data processing, scripting, automation. |
+| \`manage_clipboard\` | Read/write the Windows system clipboard. |
 
 ### Browser & Web
-- **browser** — Triple-mode browser automation.
+| Tool | What it does |
+|---|---|
+| \`browser\` | **Triple-mode browser**: Playwright (default isolated), Native Chrome (real logins via CDP/MCP), Extension Relay (real tabs via PersonalClaw extension). Check \`status\` first to see which modes are available. Scrape first (cheap) → click/type → screenshot only if visual layout matters. |
+| \`http_request\` | REST API calls (GET/POST/PUT/DELETE) with headers, auth, and response handling. |
 
-  **Mode 1 — Playwright (default)**: Persistent Chromium with its own login profile.
-  **Mode 2 — Native Chrome (Chrome 146+)**: Connected to the user's actual running Chrome session
-  via Chrome MCP server (SSE) or CDP fallback. Has all real logins, cookies, and tabs.
-  **Mode 3 — Extension Relay**: The PersonalClaw Chrome extension bridges to the user's real
-  Chrome tabs via WebSocket. Rich DOM interaction — click, type, scrape with links/forms, scroll,
-  get interactive elements. No --remote-debugging-port needed — just install the extension.
+### Intelligence & Diagnostics
+| Tool | What it does |
+|---|---|
+| \`system_info\` | Deep diagnostics: hardware, software, storage, updates, drivers, events, security, battery. Use specific actions. |
+| \`manage_processes\` | List, search, kill processes. Start/stop/restart Windows services. Resource hogs. |
+| \`network_diagnostics\` | Ping, traceroute, DNS lookups, port checks, connections, ARP, routing tables. |
+| \`analyze_vision\` | Capture screenshot → Gemini Vision analysis. Expensive — use only when text tools can't answer. |
 
-  **Decision guide**:
-  - Extension connected? Use relay_ actions for real-tab interaction (relay_tabs, relay_scrape, relay_click, etc.).
-  - Need Chrome DevTools-level access? Use connect_native for CDP/MCP mode.
-  - Need clean isolated browser? Stay in Playwright mode.
-  - Check status first: use browser skill with action="status" to see all available modes.
-
-  WORKFLOW: scrape first (cheap) → click/type → screenshot only if needed.
-
-- **http_request** — Make HTTP requests (GET/POST/PUT/DELETE). For REST APIs, webhooks, data fetching.
-
-### System Intelligence
-- **system_info** — Deep system diagnostics: hardware, software, storage, updates, drivers, events, security, battery, env vars.
-- **manage_processes** — Process/service management: list, search, kill, start/stop/restart services, startup apps, resource hogs.
-- **network_diagnostics** — Network troubleshooting: ping, traceroute, DNS, port checks, connections, interfaces, ARP, routing.
-- **analyze_vision** — Screenshot capture & Gemini Vision analysis. Expensive — use only when text tools can't answer.
-
-### Memory & Automation
-- **manage_long_term_memory** — Persistent knowledge store. Learn/recall/forget user preferences.
-- **manage_scheduler** — Cron job management for recurring tasks.
-- **paperclip_orchestration** — Paperclip multi-agent task management.
+### Memory, Automation & Multi-Agent
+| Tool | What it does |
+|---|---|
+| \`manage_long_term_memory\` | Persistent knowledge store. Learn and recall user preferences, jargon, workflows across sessions. |
+| \`manage_scheduler\` | Create, list, remove cron-based recurring tasks. |
+| \`manage_pdf\` | Extract text, merge, split, rotate, watermark, create PDFs. |
+| \`generate_image\` | AI image generation via Gemini Imagen. Returns a viewable URL. |
+| \`spawn_agent\` | Spawn a parallel sub-agent worker for independent tasks. Up to 5 concurrent. Workers cannot spawn further agents or perform destructive ops. |
 
 ---
 
-## Tool Best Practices
+## MSP & IT Expertise (Tier 3)
 
-- **Browser**: Check status first to see available modes. Extension relay for real-tab work, connect_native for CDP/MCP, Playwright for isolation. Scrape before screenshot.
-- **PowerShell**: Prefer single-line pipelines. Write complex scripts to file first.
-- **HTTP**: Use for API integrations. Check response status codes.
-- **System Info**: Use specific actions (hardware, storage, etc.) — not overview for everything.
-- **Process Manager**: Kill processes by PID when possible for precision.
-- **Network**: Start with ping, escalate to traceroute/DNS as needed.
-- **Vision**: LAST RESORT for visual analysis. Text tools are cheaper.
-- **Safety**: NEVER run destructive commands without user confirmation.
-
----
-
-## MSP & IT Specialization
-
-You are a **Tier 3 MSP IT Technician**. You know:
-- ITGlue, Meraki, ConnectWise Manage/Automate, Nilear, HaloPSA
-- Root cause analysis over surface-level symptoms
-- Systematic investigation: logs → event viewers → service states → network paths
-- Read-only by default. Don't change configs without approval.
+You are a **Tier 3 MSP IT Technician** with deep expertise in:
+- **Platforms**: ITGlue, Nilear MTX, Datto RMM, ConnectWise Manage/Automate, HaloPSA, Meraki
+- **Methodology**: Root cause analysis over surface-level fixes. Systematic investigation: logs → event viewers → service states → network paths → correlations.
+- **Posture**: Read-only by default. Never change configs, restart services, or kill processes without the user's approval unless explicitly instructed otherwise.
 ${knowledgeBlock}
 ${Learner.buildContextBlock()}
 
 ---
 
-## Communication Rules
+## Communication Style
 
-1. **Be concise**. Short, actionable responses by default.
-2. **Use markdown**. Headers, bold, code blocks, lists.
-3. **Show, don't tell**. Include command output, file contents, data.
-4. **One message per task**. Complete answer in one response.
-5. **Errors get context**. Show the error AND your diagnosis.
-6. **Display Images**. If a tool (like \`generate_image\`) returns an \`output_url\`, **ALWAYS** display the image in your response using markdown: \`![image](output_url)\`.
-
----
-
-## Safety Guardrails
-
-- **NEVER** execute destructive commands without confirmation (rm -rf, format, registry deletes).
-- **NEVER** expose .env files, API keys, or credentials unless explicitly requested.
-- **NEVER** make external network requests to unknown endpoints without user knowledge.
-- If unsure whether an action is destructive, **ask first**.
+1. **Concise by default**. Lead with the answer, not the process. Expand only when the user asks "why" or "how".
+2. **Rich markdown**. Use **bold** for key info, \`code\` for technical values, tables for structured data, headers to organize long responses. No walls of plain text.
+3. **Show evidence**. Include relevant command output, file contents, or data — don't just describe what you found.
+4. **One complete response**. Deliver the full answer in one message. Don't split across multiple turns unless the task genuinely requires back-and-forth.
+5. **Display images**. If a tool returns an \`output_url\`, display it inline: \`![image](output_url)\`.
 
 ---
 
-## Meta-Rules
+## Safety
 
-- If the user says "fix it" — recall context, ask ONE question if truly ambiguous, otherwise handle it.
-- Batch tool calls logically. Parallelize when possible.
-- If you hit the tool turn limit, summarize progress and remaining work.
-- You are running **locally on Windows**. PowerShell is your shell.
-- You are a self-learning agent. Knowledge from past conversations is injected above. Use it naturally.`;
+- **Destructive commands** (rm -rf, format, registry deletes, service stops, process kills) require explicit user confirmation. Ask first.
+- **Secrets** (.env, API keys, credentials) are never displayed unless the user specifically requests them.
+- **External requests** to unknown endpoints require user awareness.
+- When in doubt → ask. Better to confirm than to break something.
+
+---
+
+## Meta
+
+- You run **locally on Windows**. PowerShell is your shell. Paths use backslashes.
+- You are a **self-learning agent**. Knowledge from past conversations is injected above — use it proactively.
+- **Batch tool calls** when possible. Parallelize independent operations.
+- If you hit the tool turn limit (25 rounds), summarize progress and outline remaining work.
+- Never call the same singleton-resource skill (browser, vision, clipboard) more than once in the same parallel tool batch.`;
 }
+import { SkillMeta } from '../types/skill.js';
+
+// ─── Brain Config ────────────────────────────────────────────────────
+export interface BrainConfig {
+  agentId: string;
+  conversationId: string;
+  conversationLabel?: string;
+  isWorker?: boolean;
+}
+
+// Exclusive-lock skills that must not run in parallel within the same Brain
+const EXCLUSIVE_LOCK_SKILLS = new Set(['browser', 'analyze_vision', 'manage_clipboard']);
 
 // ─── Brain Class ─────────────────────────────────────────────────────
 export class Brain {
@@ -326,7 +305,23 @@ export class Brain {
   private perf: PerformanceTracker;
   private totalToolCalls: number = 0;
 
-  constructor() {
+  // v11 multi-agent fields
+  private agentId: string;
+  private conversationId: string;
+  private conversationLabel: string;
+  private isWorker: boolean;
+  private aborted: boolean = false;
+  private config: BrainConfig;
+
+  constructor(config?: BrainConfig) {
+    // Support legacy no-arg construction
+    const cfg = config ?? { agentId: 'legacy_default', conversationId: 'legacy_default' };
+    this.config = cfg;
+    this.agentId = cfg.agentId;
+    this.conversationId = cfg.conversationId;
+    this.conversationLabel = cfg.conversationLabel ?? cfg.conversationId;
+    this.isWorker = cfg.isWorker ?? false;
+
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
       console.error('\n[CRITICAL] GEMINI_API_KEY is missing or invalid in .env!');
       console.error('Please run setup.bat or manually update your .env file.\n');
@@ -344,17 +339,47 @@ export class Brain {
     eventBus.dispatch(Events.SESSION_STARTED, {
       sessionId: this.sessionId,
       model: this.activeModelId,
+      agentId: this.agentId,
+      conversationId: this.conversationId,
     }, 'brain');
 
-    console.log(`[Brain] Initialized with model: ${this.activeModelId}`);
-    console.log(`[Brain] Failover chain: ${this.failoverChain.join(' → ')}`);
-    console.log(`[Brain] Skills loaded: ${skills.length}`);
+    console.log(`[Brain:${this.agentId}] Initialized with model: ${this.activeModelId}`);
+    if (!this.isWorker) {
+      console.log(`[Brain:${this.agentId}] Failover chain: ${this.failoverChain.join(' → ')}`);
+      console.log(`[Brain:${this.agentId}] Skills loaded: ${skills.length}`);
+    }
   }
 
+  // ─── v11 Multi-Agent Methods ──────────────────────────────────────
+
+  abort(): void { this.aborted = true; }
+  resetAbort(): void { this.aborted = false; }
+  isAborted(): boolean { return this.aborted; }
+
+  private buildMeta(): SkillMeta {
+    return {
+      agentId: this.agentId,
+      conversationId: this.conversationId,
+      conversationLabel: this.conversationLabel,
+      isWorker: this.isWorker,
+    };
+  }
+
+  getHistory(): any[] { return this.history; }
+  getAgentId(): string { return this.agentId; }
+  getConversationId(): string { return this.conversationId; }
+  isWorkerAgent(): boolean { return this.isWorker; }
+
   private createModel(modelId: string): GenerativeModel {
+    // Workers never get spawn_agent
+    let toolDefs = getToolDefinitions();
+    if (this.isWorker) {
+      toolDefs = toolDefs.filter((t: any) =>
+        t.functionDeclarations[0].name !== 'spawn_agent'
+      );
+    }
     const tools = [
-      ...getToolDefinitions(),
-      // Dynamically include Chrome native MCP tools when connected (Chrome 146+)
+      ...toolDefs,
       ...chromeNativeAdapter.getGeminiToolDefs(),
     ];
     return genAI.getGenerativeModel({
@@ -475,8 +500,29 @@ export class Brain {
     throw new Error(`All models failed. Last error: ${lastError}. Chain tried: ${startModelId} → ${this.activeModelId}`);
   }
 
+  clearHistory(): void {
+    this.initSession();
+  }
+
   private initSession() {
-    const systemPrompt = buildSystemPrompt();
+    let systemPrompt = buildSystemPrompt();
+
+    // Worker system prompt guardrail — prevents destructive operations by autonomous agents
+    if (this.isWorker) {
+      systemPrompt += `\n\n---\n\nWORKER AGENT CONSTRAINTS:
+You are a sub-agent worker. Complete your assigned task and return the result.
+
+You must NOT:
+- Kill or terminate any processes
+- Stop, start, or restart any Windows services
+- Delete, clear, or reset any memory or learned preferences
+- Modify or delete any scheduled jobs
+- Perform any irreversible system operations
+
+If your task requires any of the above, return an explanation of what you would
+need to do and ask the parent conversation to confirm before acting.`;
+    }
+
     this.history = [
       {
         role: 'user',
@@ -484,7 +530,7 @@ export class Brain {
       },
       {
         role: 'model',
-        parts: [{ text: 'Online. PersonalClaw v10 is ready. What do you need?' }],
+        parts: [{ text: 'Online. PersonalClaw v11 is ready. What do you need?' }],
       },
     ];
     this.turnCount = 0;
@@ -559,7 +605,7 @@ export class Brain {
 
         this.history = [
           { role: 'user', parts: [{ text: systemPrompt }] },
-          { role: 'model', parts: [{ text: 'Online. PersonalClaw v10 is ready. What do you need?' }] },
+          { role: 'model', parts: [{ text: 'Online. PersonalClaw v11 is ready. What do you need?' }] },
           { role: 'user', parts: [{ text: `[CONTEXT_RECOVERY] Summary of prior conversation:\n${summary}` }] },
           { role: 'model', parts: [{ text: 'Context recovered. Continuing where we left off.' }] },
           ...recentHistory,
@@ -586,7 +632,7 @@ export class Brain {
 
   private handleHelp(): string {
     return [
-      `## PersonalClaw v10 Commands`,
+      `## PersonalClaw v11 Commands`,
       ``,
       `### Session`,
       `| Command | Description |`,
@@ -671,7 +717,7 @@ export class Brain {
       const perfStats = this.perf.getStats();
 
       return [
-        `## PersonalClaw v10 Status`,
+        `## PersonalClaw v11 Status`,
         ``,
         `| | |`,
         `|---|---|`,
@@ -1115,6 +1161,9 @@ export class Brain {
     eventBus.dispatch(Events.MESSAGE_RECEIVED, {
       text: msgTrimmed.substring(0, 200),
       source: 'user',
+      agentId: this.agentId,
+      conversationId: this.conversationId,
+      isWorker: this.isWorker,
     }, 'brain');
 
     // ── Slash Commands (handled locally, no model call) ──
@@ -1239,25 +1288,42 @@ export class Brain {
       const allParts = response.candidates[0].content.parts;
       const toolCalls = allParts.filter((part: any) => part.functionCall);
       const toolResults: any[] = [];
+      const meta = this.buildMeta();
 
-      const callPromises = toolCalls.map(async (call: any) => {
+      // Invoke a single tool call with abort check, meta passing, and event emissions
+      const invokeTool = async (call: any) => {
         const { name, args } = call.functionCall;
         const startTime = Date.now();
-        console.log(`[Brain] Tool: ${name}`, JSON.stringify(args).substring(0, 200));
+        console.log(`[Brain:${this.agentId}] Tool: ${name}`, JSON.stringify(args).substring(0, 200));
 
-        eventBus.dispatch(Events.TOOL_CALLED, { name, args }, 'brain');
+        eventBus.dispatch(Events.TOOL_CALLED, {
+          name, args,
+          agentId: this.agentId,
+          conversationId: this.conversationId,
+          conversationLabel: this.conversationLabel,
+          isWorker: this.isWorker,
+        }, 'brain');
 
         try {
+          // Abort check — allows kill() to cleanly stop in-flight workers
+          if (this.aborted) throw new Error('Brain aborted');
+
           // Route chrome_ prefixed tools to Chrome native MCP adapter
           const output = chromeNativeAdapter.isChromeMCPTool(name)
             ? await chromeNativeAdapter.executeChromeTool(name, args)
-            : await handleToolCall(name, args);
+            : await handleToolCall(name, args, meta);
           const elapsed = Date.now() - startTime;
-          console.log(`[Brain] ${name} completed in ${elapsed}ms`);
+          console.log(`[Brain:${this.agentId}] ${name} completed in ${elapsed}ms`);
           toolCallsThisRequest++;
           this.totalToolCalls++;
 
-          eventBus.dispatch(Events.TOOL_COMPLETED, { name, durationMs: elapsed }, 'brain');
+          eventBus.dispatch(Events.TOOL_COMPLETED, {
+            name, durationMs: elapsed, success: true,
+            agentId: this.agentId,
+            conversationId: this.conversationId,
+            conversationLabel: this.conversationLabel,
+            isWorker: this.isWorker,
+          }, 'brain');
 
           if (onUpdate) {
             onUpdate(`\`${name}\` completed (${elapsed}ms)`);
@@ -1268,11 +1334,17 @@ export class Brain {
           };
         } catch (e: any) {
           const elapsed = Date.now() - startTime;
-          console.error(`[Brain] ${name} failed in ${elapsed}ms:`, e.message);
+          console.error(`[Brain:${this.agentId}] ${name} failed in ${elapsed}ms:`, e.message);
           toolCallsThisRequest++;
           this.totalToolCalls++;
 
-          eventBus.dispatch(Events.TOOL_FAILED, { name, error: e.message, durationMs: elapsed }, 'brain');
+          eventBus.dispatch(Events.TOOL_FAILED, {
+            name, error: e.message, durationMs: elapsed,
+            agentId: this.agentId,
+            conversationId: this.conversationId,
+            conversationLabel: this.conversationLabel,
+            isWorker: this.isWorker,
+          }, 'brain');
 
           if (onUpdate) {
             onUpdate(`\`${name}\` failed: ${e.message}`);
@@ -1290,10 +1362,19 @@ export class Brain {
             },
           };
         }
-      });
+      };
 
-      const results = await Promise.all(callPromises);
-      toolResults.push(...results);
+      // Parallel tool dedup — exclusive-lock skills run sequentially to prevent self-deadlock
+      const parallelSafe = toolCalls.filter((t: any) => !EXCLUSIVE_LOCK_SKILLS.has(t.functionCall.name));
+      const mustSequence = toolCalls.filter((t: any) => EXCLUSIVE_LOCK_SKILLS.has(t.functionCall.name));
+
+      const parallelResults = await Promise.all(parallelSafe.map(invokeTool));
+      const sequentialResults: any[] = [];
+      for (const call of mustSequence) {
+        sequentialResults.push(await invokeTool(call));
+      }
+
+      toolResults.push(...parallelResults, ...sequentialResults);
 
       result = await this.sendWithFailover(toolResults);
       response = result.response;
@@ -1323,6 +1404,9 @@ export class Brain {
       durationMs: requestDuration,
       toolCalls: toolCallsThisRequest,
       model: this.activeModelId,
+      agentId: this.agentId,
+      conversationId: this.conversationId,
+      isWorker: this.isWorker,
     }, 'brain');
 
     // Queue conversation for background self-learning analysis

@@ -2,6 +2,8 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { Skill, SkillMeta } from '../types/skill.js';
+import { skillLock } from '../core/skill-lock.js';
 
 // pdfjs-dist for text extraction (pure JS, no native deps)
 // @ts-ignore
@@ -200,7 +202,7 @@ async function extractPages(filePath: string, pages: string, outputName?: string
 
 // ─── Skill Export ────────────────────────────────────────────────────────────
 
-export const pdfSkill = {
+export const pdfSkill: Skill = {
   name: 'manage_pdf',
   description: `Comprehensive PDF skill. Actions:
 - extract_text: Extract all text from a PDF file.
@@ -252,61 +254,89 @@ export const pdfSkill = {
     required: ['action'],
   },
 
-  run: async (args: any): Promise<any> => {
-    // Note: No API key needed for local PDF operations, but we keep this consistent with other skills if needed.
+  run: async (args: any, meta: SkillMeta): Promise<any> => {
     const { action, file_path, file_paths, output_name, rotation_degrees, watermark_text, ranges, content } = args;
+    const writeActions = new Set(['merge', 'split', 'rotate', 'watermark', 'create', 'extract_pages']);
 
-    try {
-      switch (action) {
-        case 'extract_text': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          const text = await extractText(file_path);
-          return { success: true, text, char_count: text.length };
-        }
-        case 'metadata': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          const meta = await getMetadata(file_path);
-          return { success: true, metadata: meta };
-        }
-        case 'merge': {
-          if (!file_paths?.length) return { success: false, error: 'file_paths array required' };
-          const out = await mergePdfs(file_paths, output_name ?? 'merged.pdf');
-          return { success: true, output_path: out };
-        }
-        case 'split': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          if (!ranges) return { success: false, error: 'ranges required (e.g. "1-3,4-6")' };
-          const parts = await splitPdf(file_path, ranges);
-          return { success: true, output_paths: parts };
-        }
-        case 'rotate': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          if (!rotation_degrees) return { success: false, error: 'rotation_degrees required' };
-          const out = await rotatePdf(file_path, rotation_degrees, output_name);
-          return { success: true, output_path: out };
-        }
-        case 'watermark': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          if (!watermark_text) return { success: false, error: 'watermark_text required' };
-          const out = await addWatermark(file_path, watermark_text, output_name);
-          return { success: true, output_path: out };
-        }
-        case 'create': {
-          if (!content) return { success: false, error: 'content required' };
-          const out = await createPdf(content, output_name ?? 'created.pdf');
-          return { success: true, output_path: out };
-        }
-        case 'extract_pages': {
-          if (!file_path) return { success: false, error: 'file_path required' };
-          if (!ranges) return { success: false, error: 'ranges required (e.g. "1,3,5")' };
-          const out = await extractPages(file_path, ranges, output_name);
-          return { success: true, output_path: out };
-        }
-        default:
-          return { success: false, error: `Unknown action: ${action}` };
+    // Write actions that produce output files get a per-path write lock
+    if (writeActions.has(action) && output_name) {
+      const absolutePath = path.resolve(OUTPUTS_DIR, output_name.endsWith('.pdf') ? output_name : `${output_name}.pdf`);
+      const lockKey = `files:${absolutePath}` as const;
+      let release: (() => void) | undefined;
+      try {
+        release = await skillLock.acquireWrite(lockKey, {
+          agentId: meta.agentId, conversationId: meta.conversationId,
+          conversationLabel: meta.conversationLabel,
+          operation: `pdf:${action}:${absolutePath}`, acquiredAt: new Date(),
+        });
+        return await executePdfAction(action, file_path, file_paths, output_name, rotation_degrees, watermark_text, ranges, content);
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      } finally {
+        release?.();
       }
+    }
+
+    // Read-only actions or write actions without explicit output_name — no lock needed
+    try {
+      return await executePdfAction(action, file_path, file_paths, output_name, rotation_degrees, watermark_text, ranges, content);
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   },
 };
+
+async function executePdfAction(
+  action: string, file_path: string, file_paths: string[],
+  output_name: string, rotation_degrees: number,
+  watermark_text: string, ranges: string, content: string
+): Promise<any> {
+  switch (action) {
+    case 'extract_text': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      const text = await extractText(file_path);
+      return { success: true, text, char_count: text.length };
+    }
+    case 'metadata': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      const pdfMeta = await getMetadata(file_path);
+      return { success: true, metadata: pdfMeta };
+    }
+    case 'merge': {
+      if (!file_paths?.length) return { success: false, error: 'file_paths array required' };
+      const out = await mergePdfs(file_paths, output_name ?? 'merged.pdf');
+      return { success: true, output_path: out };
+    }
+    case 'split': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      if (!ranges) return { success: false, error: 'ranges required (e.g. "1-3,4-6")' };
+      const parts = await splitPdf(file_path, ranges);
+      return { success: true, output_paths: parts };
+    }
+    case 'rotate': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      if (!rotation_degrees) return { success: false, error: 'rotation_degrees required' };
+      const out = await rotatePdf(file_path, rotation_degrees, output_name);
+      return { success: true, output_path: out };
+    }
+    case 'watermark': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      if (!watermark_text) return { success: false, error: 'watermark_text required' };
+      const out = await addWatermark(file_path, watermark_text, output_name);
+      return { success: true, output_path: out };
+    }
+    case 'create': {
+      if (!content) return { success: false, error: 'content required' };
+      const out = await createPdf(content, output_name ?? 'created.pdf');
+      return { success: true, output_path: out };
+    }
+    case 'extract_pages': {
+      if (!file_path) return { success: false, error: 'file_path required' };
+      if (!ranges) return { success: false, error: 'ranges required (e.g. "1,3,5")' };
+      const out = await extractPages(file_path, ranges, output_name);
+      return { success: true, output_path: out };
+    }
+    default:
+      return { success: false, error: `Unknown action: ${action}` };
+  }
+}

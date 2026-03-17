@@ -6,7 +6,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 const execAsync = promisify(exec);
 
@@ -58,7 +58,7 @@ Actions:
     sort?: string;
     filter?: string;
     count?: number;
-  }) => {
+  }, _meta: SkillMeta) => {
     try {
       let command: string;
       const n = count || 20;

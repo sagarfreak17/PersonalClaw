@@ -5,7 +5,7 @@ import { visionSkill } from './vision.js';
 import { clipboardSkill } from './clipboard.js';
 import { memorySkill } from './memory.js';
 import { schedulerSkill, initScheduler } from './scheduler.js';
-import { paperclipSkill } from './paperclip.js';
+
 import { browserSkill } from './browser.js';
 import { httpSkill } from './http.js';
 import { networkSkill } from './network.js';
@@ -13,7 +13,8 @@ import { processManagerSkill } from './process-manager.js';
 import { systemInfoSkill } from './system-info.js';
 import { pdfSkill } from './pdf.js';
 import { imagegenSkill } from './imagegen.js';
-import { Skill } from '../types/skill.js';
+import { agentSpawnSkill } from './agent-spawn.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 export const skills: Skill[] = [
   shellSkill,
@@ -23,7 +24,6 @@ export const skills: Skill[] = [
   clipboardSkill,
   schedulerSkill,
   memorySkill,
-  paperclipSkill,
   browserSkill,
   httpSkill,
   networkSkill,
@@ -31,6 +31,7 @@ export const skills: Skill[] = [
   systemInfoSkill,
   pdfSkill,
   imagegenSkill,
+  agentSpawnSkill,
 ];
 
 export { initScheduler };
@@ -47,10 +48,17 @@ export const getToolDefinitions = () => {
   }));
 };
 
-export const handleToolCall = async (name: string, args: any) => {
+const DEFAULT_META: SkillMeta = {
+  agentId: 'default',
+  conversationId: 'default',
+  conversationLabel: 'Chat 1',
+  isWorker: false,
+};
+
+export const handleToolCall = async (name: string, args: any, meta: SkillMeta = DEFAULT_META) => {
   const skill = skills.find(s => s.name === name);
   if (!skill) {
     throw new Error(`Skill ${name} not found`);
   }
-  return await skill.run(args);
+  return await skill.run(args, meta);
 };

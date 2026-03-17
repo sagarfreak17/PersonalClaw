@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,7 +20,7 @@ export const pythonSkill: Skill = {
     },
     required: ['code'],
   },
-  run: async ({ code }: { code: string }) => {
+  run: async ({ code }: { code: string }, _meta: SkillMeta) => {
     const tempFile = path.join(process.cwd(), 'temp_script.py');
     try {
       fs.writeFileSync(tempFile, code);

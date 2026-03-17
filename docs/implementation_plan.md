@@ -1,4 +1,6 @@
-# Implementation Plan - PersonalClaw
+# Implementation Plan - PersonalClaw (Legacy)
+
+> **Note:** This is the original implementation plan. For the v11 plan (multi-chat, multi-agent, skill locks), see `PersonalClaw_v11_Implementation_Plan_FINAL.md`.
 
 Building a custom, lightweight AI agent for direct Windows control, featuring a premium web dashboard and Telegram integration.
 
@@ -32,7 +34,7 @@ Building a custom, lightweight AI agent for direct Windows control, featuring a 
 
 ### Phase 4: Full Windows Control
 - [/] **System Automation:** Media controls, app launching, and window management.
-- [x] **Paperclip Integration:** Multi-agent orchestration layer.
+
 - [x] **Tasker Integration:** Bridge for the OnePlus 12 server synergy.
 
 ## 🛠️ Tech Stack

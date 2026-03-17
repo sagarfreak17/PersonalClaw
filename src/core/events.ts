@@ -44,6 +44,14 @@ class EventBus extends EventEmitter {
   }
 
   /**
+   * Remove a listener for a specific event type. (FIX-4)
+   * Required for agent-registry cleanup to prevent listener leaks.
+   */
+  off(event: string, listener: (...args: any[]) => void): this {
+    return super.off(event, listener);
+  }
+
+  /**
    * Get recent events, optionally filtered by type.
    */
   getRecentEvents(count: number = 50, type?: string): ClawEvent[] {
@@ -101,4 +109,24 @@ export const Events = {
   RELAY_CONNECTED: 'relay:extension_connected',
   RELAY_DISCONNECTED: 'relay:extension_disconnected',
   RELAY_TABS_UPDATE: 'relay:tabs_update',
+
+  // ─── v11 Multi-Agent & Skill Lock Events ───────────────────────────
+  // Conversation lifecycle
+  CONVERSATION_CREATED: 'conversation:created',
+  CONVERSATION_CLOSED: 'conversation:closed',
+  CONVERSATION_ABORTED: 'conversation:aborted',
+
+  // Agent worker lifecycle
+  AGENT_WORKER_STARTED: 'agent:worker_started',
+  AGENT_WORKER_COMPLETED: 'agent:worker_completed',
+  AGENT_WORKER_FAILED: 'agent:worker_failed',
+  AGENT_WORKER_TIMED_OUT: 'agent:worker_timed_out',
+  AGENT_WORKER_QUEUED: 'agent:worker_queued',
+
+  // Skill lock events (FIX-1: emitted by skill-lock.ts, consumed by agent-registry.ts)
+  SKILL_LOCK_WAITING: 'skill:lock_waiting',
+  SKILL_LOCK_ACQUIRED: 'skill:lock_acquired',
+  SKILL_LOCK_RELEASED: 'skill:lock_released',
+  SKILL_LOCK_QUEUED: 'skill:lock_queued',
 } as const;
+

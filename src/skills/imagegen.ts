@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 const OUTPUTS_DIR = path.join(process.cwd(), 'outputs');
 
@@ -56,7 +57,7 @@ async function generateNativeImage(
 
 // ─── Skill Export ─────────────────────────────────────────────────────────────
 
-export const imagegenSkill = {
+export const imagegenSkill: Skill = {
   name: 'generate_image',
   description: `Generate high-quality images using Google's newest Gemini Pro and Flash Image models.
 Two modes with auto-fallback:
@@ -92,7 +93,7 @@ To display the image in the chat, use markdown: ![image](http://localhost:3000/o
     required: ['prompt'],
   },
 
-  run: async (args: any): Promise<any> => {
+  run: async (args: any, _meta: SkillMeta): Promise<any> => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) return { success: false, error: 'GEMINI_API_KEY or GOOGLE_API_KEY not set in .env' };
 

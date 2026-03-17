@@ -2,7 +2,8 @@ import screenshot from 'screenshot-desktop';
 import * as fs from 'fs';
 import * as path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
+import { skillLock } from '../core/skill-lock.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -28,8 +29,14 @@ export const visionSkill: Skill = {
     },
     required: ['prompt'],
   },
-  run: async ({ imagePath, prompt }: { imagePath?: string; prompt: string }) => {
+  run: async ({ imagePath, prompt }: { imagePath?: string; prompt: string }, meta: SkillMeta) => {
+    let release: (() => void) | undefined;
     try {
+      release = await skillLock.acquireExclusive('browser_vision', {
+        agentId: meta.agentId, conversationId: meta.conversationId,
+        conversationLabel: meta.conversationLabel,
+        operation: 'vision:analyze', acquiredAt: new Date(),
+      });
       console.log(`[Vision] Starting analysis with prompt: "${prompt}"`);
       let finalPath = imagePath;
 
@@ -73,6 +80,8 @@ export const visionSkill: Skill = {
     } catch (error: any) {
       console.error(`[Vision] Error:`, error);
       return { success: false, error: error.message };
+    } finally {
+      release?.();
     }
   },
 };

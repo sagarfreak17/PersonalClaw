@@ -7,7 +7,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 const execAsync = promisify(exec);
 
@@ -55,7 +55,7 @@ Built for MSP/IT diagnostics. All commands run via PowerShell on Windows.`,
     target?: string;
     port?: number;
     filter?: string;
-  }) => {
+  }, _meta: SkillMeta) => {
     try {
       let command: string;
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ChatInput from './components/ChatInput';
+import { ChatWorkspace } from './components/ChatWorkspace';
 
 import { io, Socket } from 'socket.io-client';
 import {
@@ -61,7 +62,7 @@ type TabType = 'command' | 'metrics' | 'activity' | 'skills';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Welcome back. PersonalClaw v10 is online and ready.', sender: 'bot', timestamp: new Date() }
+    { id: '1', text: 'Welcome back. PersonalClaw v11 is online and ready.', sender: 'bot', timestamp: new Date() }
   ]);
 
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -81,6 +82,7 @@ const App: React.FC = () => {
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
   const [ramHistory, setRamHistory] = useState<number[]>([]);
   const [toasts, setToasts] = useState<{ id: string; text: string; type: 'info' | 'success' | 'error' }[]>([]);
+  const [isSuperUser, setIsSuperUser] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const commandPaletteRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +171,10 @@ const App: React.FC = () => {
       }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
+      }
+      // Superuser toggle (Ctrl+Shift+D) — shows raw agent logs
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        setIsSuperUser(prev => !prev);
       }
     };
     window.addEventListener('keydown', handler);
@@ -296,7 +302,7 @@ const App: React.FC = () => {
           <Sparkles size={22} style={{ color: 'var(--accent-primary)' }} />
           <h1>PersonalClaw</h1>
         </div>
-        <div className="version-badge">v10.0</div>
+        <div className="version-badge">v11.0</div>
 
         <nav style={{ flex: 1 }}>
           <ul style={{ listStyle: 'none' }}>
@@ -383,107 +389,16 @@ const App: React.FC = () => {
         {/* Tab Content */}
         <div className="content-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <AnimatePresence mode="wait">
-            {/* ── Command Center ── */}
-            {activeTab === 'command' && (
+            {/* ── Command Center — Multi-Chat Workspace ── */}
+            {activeTab === 'command' && socket && (
               <motion.div
                 key="chat"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="chat-panel"
-                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
-                <div className="terminal-header">
-                  <div className="dot red" />
-                  <div className="dot yellow" />
-                  <div className="dot green" />
-                  <span className="terminal-title">personalclaw-v10.0 --active</span>
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {connected ? <Wifi size={14} style={{ color: '#27c93f' }} /> : <WifiOff size={14} style={{ color: '#ff5f56' }} />}
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{serverInfo?.model || 'loading...'}</span>
-                  </div>
-                </div>
-
-                <div className="messages-container">
-                  <AnimatePresence initial={false}>
-                    {messages.map((msg) => (
-                      <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        className={`message ${msg.sender}`}
-                      >
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                          <div className="message-avatar">
-                            {msg.sender === 'bot' ? <Bot size={16} /> : <User size={16} />}
-                          </div>
-                          <div className="message-text">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.text}
-                            </ReactMarkdown>
-                            {msg.image && (
-                              <img
-                                src={msg.image}
-                                alt="Uploaded content"
-                                style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '10px', border: '1px solid var(--border)' }}
-                              />
-                            )}
-                            {msg.sender === 'bot' && (
-                              <button
-                                className="copy-btn"
-                                onClick={() => handleCopy(msg.text, msg.id)}
-                                title="Copy to clipboard"
-                              >
-                                {copiedId === msg.id ? <Check size={14} /> : <Copy size={14} />}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-
-                    {/* Typing indicator with tool updates */}
-                    {isBotTyping && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="message bot typing-message"
-                      >
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div className="message-avatar">
-                            <Bot size={16} />
-                          </div>
-                          <div>
-                            {toolUpdates.length > 0 && (
-                              <div className="tool-updates">
-                                {toolUpdates.map((update, i) => (
-                                  <div key={i} className="tool-update-item">
-                                    <ChevronRight size={12} />
-                                    <span>{update}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="typing-indicator">
-                              <div className="typing-dot" />
-                              <div className="typing-dot" />
-                              <div className="typing-dot" />
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <div ref={messagesEndRef} />
-                </div>
-
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onScreenshot={handleScreenshot}
-                  isCapturing={isCapturing}
-                  pendingScreenshot={pendingScreenshot}
-                  onRemoveScreenshot={() => setPendingScreenshot(null)}
-                />
+                <ChatWorkspace socket={socket} isSuperUser={isSuperUser} />
               </motion.div>
             )}
 

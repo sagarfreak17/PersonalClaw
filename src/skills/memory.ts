@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
+import { skillLock } from '../core/skill-lock.js';
 
 
 const MEMORY_FILE = path.join(process.cwd(), 'memory', 'long_term_knowledge.json');
@@ -27,8 +28,18 @@ export const memorySkill: Skill = {
     },
     required: ['action'],
   },
-  run: async ({ action, key, value }: { action: string; key?: string; value?: string }) => {
+  run: async ({ action, key, value }: { action: string; key?: string; value?: string }, meta: SkillMeta) => {
+    const writeActions = new Set(['learn', 'forget']);
+    const holderBase = {
+      agentId: meta.agentId, conversationId: meta.conversationId,
+      conversationLabel: meta.conversationLabel,
+      operation: `memory:${action}`, acquiredAt: new Date(),
+    };
+    let release: (() => void) | undefined;
     try {
+      release = writeActions.has(action)
+        ? await skillLock.acquireWrite('memory', holderBase)
+        : await skillLock.acquireRead('memory', holderBase);
       if (!fs.existsSync(path.dirname(MEMORY_FILE))) {
         fs.mkdirSync(path.dirname(MEMORY_FILE), { recursive: true });
       }
@@ -62,6 +73,8 @@ export const memorySkill: Skill = {
       }
     } catch (error: any) {
       return { success: false, error: error.message };
+    } finally {
+      release?.();
     }
   },
 };

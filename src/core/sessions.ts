@@ -22,6 +22,22 @@ export interface SessionInfo {
 
 export class SessionManager {
   /**
+   * Save a conversation's history to disk.
+   * Used by ConversationManager when closing a pane.
+   */
+  static saveSession(name: string, history: any[]): string {
+    const timestamp = Date.now();
+    const safeName = name.toLowerCase().replace(/\s+/g, '-'); // "Chat 1" → "chat-1"
+    const sessionId = `session_${timestamp}_${safeName}`;
+    const filePath = path.join(MEMORY_DIR, `${sessionId}.json`);
+    if (!fs.existsSync(MEMORY_DIR)) {
+      fs.mkdirSync(MEMORY_DIR, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(history, null, 2));
+    return sessionId;
+  }
+
+  /**
    * List all saved sessions, sorted newest first.
    */
   static listSessions(limit: number = 20): SessionInfo[] {

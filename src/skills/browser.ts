@@ -1,7 +1,8 @@
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 import { browserManager } from '../core/browser.js';
 import { chromeNativeAdapter } from '../core/chrome-mcp.js';
 import { extensionRelay } from '../core/relay.js';
+import { skillLock } from '../core/skill-lock.js';
 
 /**
  * Unified browser skill — the ONLY browser tool for PersonalClaw.
@@ -117,8 +118,14 @@ DECISION GUIDE:
     port?: number;
     args?: string;
     tab_id?: number;
-  }) => {
+  }, meta: SkillMeta) => {
+    let release: (() => void) | undefined;
     try {
+      release = await skillLock.acquireExclusive('browser_vision', {
+        agentId: meta.agentId, conversationId: meta.conversationId,
+        conversationLabel: meta.conversationLabel,
+        operation: `browser:${action}`, acquiredAt: new Date(),
+      });
       switch (action) {
 
         // ── Native Chrome Connection ──────────────────────────────────
@@ -319,6 +326,8 @@ DECISION GUIDE:
     } catch (error: any) {
       console.error(`[Browser] Error in action "${action}":`, error.message);
       return { success: false, error: error.message };
+    } finally {
+      release?.();
     }
   },
 };

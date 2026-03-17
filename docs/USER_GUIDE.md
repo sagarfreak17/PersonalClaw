@@ -1,9 +1,9 @@
-# PersonalClaw v10.0: End-User Guide 🛸
+# PersonalClaw v11.0: End-User Guide 🛸
 **Developed by Sagar Kalra**
 
 ![PersonalClaw Logo](assets/logo.png)
 
-Welcome to **PersonalClaw v10.0**, your next-generation AI agent for Windows. This guide teaches you to leverage its full power.
+Welcome to **PersonalClaw v11.0**, your next-generation AI agent for Windows. This guide teaches you to leverage its full power.
 
 ---
 
@@ -107,22 +107,47 @@ PersonalClaw evolves by learning from your conversations.
 
 ---
 
+## 🧩 v11 Multi-Chat & Multi-Agent
+
+### Multi-Pane Workspace
+- Click the **+** button in the bottom-right to open a new chat pane (up to 3)
+- Each pane is independent with its own AI Brain and conversation history
+- Drag the divider between panes to resize
+- Click **x** on a pane header to close it (history auto-saved to sessions)
+- Panes are auto-labeled Chat 1, Chat 2, Chat 3
+
+### Sub-Agent Workers
+- The AI can spawn up to 5 parallel sub-agent workers per pane for independent tasks
+- Workers appear in a collapsible side panel on the right of each pane
+- Status indicators: blue (running), amber (waiting for resource), green (done), red (failed)
+- Workers have a 5-minute timeout and cannot perform destructive operations
+
+### Superuser Mode
+- Press **Ctrl+Shift+D** to toggle superuser mode
+- When enabled, completed worker cards show a **View Logs** button with raw execution data
+- No visual indicator of mode — press again to toggle off
+
+### Skill Locks
+- When multiple agents use the same resource (browser, clipboard, etc.), a lock system prevents conflicts
+- Workers waiting for a lock show an amber "Waiting for resource" status with holder info
+- Check current locks: `GET /api/locks`
+
+### New REST Endpoints
+- `POST /api/conversations` — Create a new conversation
+- `GET /api/conversations` — List all active conversations
+- `DELETE /api/conversations/:id` — Close and save a conversation
+- `GET /api/conversations/:id/agents` — List workers for a conversation
+- `GET /api/agents/:agentId/logs` — Get raw logs for a worker
+- `GET /api/locks` — Get current skill lock state
+
+---
+
 ## 🆘 Troubleshooting
 - **Extension Disconnected?** Go to `chrome://extensions` and click the **Refresh** icon.
 - **Bot not responding?** Ensure `npm run dev` is running in the main project folder.
 
 ---
 
-## 🏢 Zero-Human Company (Paperclip)
-
-PersonalClaw now supports integration with **Paperclip AI**, an orchestration layer for running entire AI companies.
-
-- **Access Dashboard**: Visit `http://localhost:3100`.
-- **Launch Command**: Run `npx paperclipai onboard --yes` in your terminal to start the engine.
-- **Workflow**: Assign tickets to specialized agents (CEO, CTO, etc.) and let them work autonomously.
-- **Documentation**: See [PAPERCLIP_SOP.md](file:///c:/All Projects/PersonalClaw/docs/PAPERCLIP_SOP.md) for full setup instructions.
-
----
 
 *“PersonalClaw: Your machine, your command, anywhere.”*
 

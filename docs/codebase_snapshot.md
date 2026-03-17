@@ -1,6 +1,6 @@
 # PersonalClaw: Codebase Snapshot 📸
 
-This document provides the full source code structure and core logic for the PersonalClaw system as of March 14, 2026 (v1.14.0).
+> **Note:** This snapshot was originally captured at v1.14.0 (March 14, 2026). The codebase has since been upgraded to **v11.0.0** (March 17, 2026) with multi-chat workspaces, multi-agent workers, and a skill lock system. For the current architecture, see `codebase_documentation.md` and `version_log.md`.
 
 ---
 
@@ -188,7 +188,7 @@ const App: React.FC = () => {
 
 ## 🚀 Version Log Summary
 - **v1.14.0**: Streamlined Browser Architecture. Unified 3 systems into 1. Removed MCP/Stagehand/Relay overlap.
-- **v1.13.0**: Added Stagehand AI Browser and Paperclip Orchestration.
+- **v1.13.0**: Added Stagehand AI Browser for natural language navigation.
 - **v1.12.0**: Integrated Long-Term Memory and Tier 3 MSP specializations.
 - **v1.10.0**: Added Slash Commands and Persistent Browser profiles.
 - **v1.1.0**: Added Markdown support, Light/Dark mode, and Gemini 3 Preview integration.

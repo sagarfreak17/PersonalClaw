@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Skill } from '../types/skill.js';
+import { Skill, SkillMeta } from '../types/skill.js';
 
 
 const execAsync = promisify(exec);
@@ -18,7 +18,7 @@ export const shellSkill: Skill = {
     },
     required: ['command'],
   },
-  run: async ({ command }: { command: string }) => {
+  run: async ({ command }: { command: string }, _meta: SkillMeta) => {
     try {
       const { stdout, stderr } = await execAsync(`powershell -Command "${command.replace(/"/g, '`"')}"`);
       return {

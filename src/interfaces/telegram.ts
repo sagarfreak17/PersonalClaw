@@ -1,10 +1,11 @@
 import { Telegraf } from 'telegraf';
-import { Brain } from '../core/brain.js';
+// FIX-3: telegramBrain imported from neutral file, not declared here
+import { telegramBrain } from '../core/telegram-brain.js';
 
 export class TelegramInterface {
   private bot: Telegraf | null = null;
 
-  constructor(private brain: Brain) {
+  constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (token) {
       this.bot = new Telegraf(token);
@@ -22,7 +23,7 @@ export class TelegramInterface {
     if (!this.bot) return;
 
     this.bot.start((ctx) => ctx.reply('Welcome to PersonalClaw. I am your Windows agent. Send me a command!'));
-    
+
     this.bot.on('text', async (ctx) => {
       const message = ctx.message.text;
       const chatId = ctx.from?.id;
@@ -35,10 +36,10 @@ export class TelegramInterface {
       }
 
       console.log(`[Telegram] Received message from ${chatId}:`, message);
-      
+
       try {
         await ctx.sendChatAction('typing');
-        const response = await this.brain.processMessage(message);
+        const response = await telegramBrain.processMessage(message);
         await ctx.reply(response);
       } catch (error: any) {
         await ctx.reply(`Error: ${error.message}`);
@@ -53,7 +54,7 @@ export class TelegramInterface {
       if (authorizedId && chatId?.toString() !== authorizedId) {
         return;
       }
-      
+
       await ctx.reply('Vision capabilities are being integrated. I can see the photo but I need a moment to process it in context.');
     });
   }

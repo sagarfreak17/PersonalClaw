@@ -254,6 +254,16 @@ io.on('connection', (socket) => {
     socket.emit('conversation:list', conversationManager.list());
   });
 
+  // Send chat history for a conversation (used on reconnect / page refresh)
+  socket.on('conversation:history', ({ conversationId }: { conversationId: string }) => {
+    try {
+      const messages = conversationManager.getMessages(conversationId);
+      socket.emit('conversation:history', { conversationId, messages });
+    } catch (err: any) {
+      socket.emit('conversation:error', { message: err.message });
+    }
+  });
+
   // ── Agent management ──
   socket.on('agent:list', ({ conversationId }: { conversationId: string }) => {
     socket.emit('agent:list', {

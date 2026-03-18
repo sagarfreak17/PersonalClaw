@@ -62,6 +62,40 @@ class ConversationManager {
     return Array.from(this.conversations.values()).map(c => this.toInfo(c));
   }
 
+  /**
+   * Return the chat history for a conversation formatted for the frontend.
+   * Strips system prompt, tool calls, and internal entries.
+   */
+  getMessages(conversationId: string): { id: string; role: string; text: string; conversationId: string }[] {
+    const convo = this.get(conversationId);
+    const history = convo.brain.getHistory();
+    const messages: { id: string; role: string; text: string; conversationId: string }[] = [];
+
+    // Skip first 2 entries (system prompt + initial model greeting)
+    for (let i = 2; i < history.length; i++) {
+      const entry = history[i];
+      if (entry.role === 'function') continue;
+
+      const text = (entry.parts || [])
+        .filter((p: any) => p.text)
+        .map((p: any) => p.text)
+        .join('\n')
+        .trim();
+
+      if (!text) continue;
+      if (text.startsWith('[CONTEXT_RECOVERY]')) continue;
+
+      messages.push({
+        id: `hist_${conversationId}_${i}`,
+        role: entry.role === 'model' ? 'assistant' : 'user',
+        text,
+        conversationId,
+      });
+    }
+
+    return messages;
+  }
+
   async send(conversationId: string, message: string): Promise<string> {
     const convo = this.get(conversationId);
     convo.lastActivityAt = new Date();

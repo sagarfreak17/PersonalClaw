@@ -12,6 +12,7 @@ All notable changes to the PersonalClaw agent will be documented in this file.
   - **Activity Feed**: Abort actions are now logged to the activity feed as "Conversation aborted".
 
 ### Fixed
+- **Chat History Lost on Refresh**: Chat messages no longer disappear when the dashboard page is refreshed. The frontend now requests conversation history from the backend on connect via a new `conversation:history` socket event. New `ConversationManager.getMessages()` converts Gemini API history to frontend format, stripping system prompts, tool calls, and internal entries.
 - **Stale Conversations**: Fixed "Conversation not found" error after server restarts by resyncing conversation IDs from the `init` socket event and re-requesting the list on reconnect.
 - **Agent Offline Indicator**: Fixed a regression where the "Agent" status showed "Offline" even when connected. Refactored `useConversations.ts` listeners to use named handlers for surgical cleanup, preserving unrelated listeners like the connectivity status.
 

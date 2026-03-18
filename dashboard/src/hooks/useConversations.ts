@@ -25,6 +25,12 @@ export function useConversations(socket: Socket) {
           for (const id of Object.keys(prev)) {
             if (validIds.has(id)) next[id] = prev[id];
           }
+          // Request history for conversations that have no frontend messages
+          for (const c of list) {
+            if (!next[c.id] || next[c.id].length === 0) {
+              socket.emit('conversation:history', { conversationId: c.id });
+            }
+          }
           return next;
         });
         setIsWaiting({});
@@ -74,6 +80,14 @@ export function useConversations(socket: Socket) {
       }));
     };
 
+    const onHistory = ({ conversationId, messages }: { conversationId: string; messages: Message[] }) => {
+      setMessages(prev => {
+        // Only populate if we don't already have messages (avoid overwriting active chat)
+        if (prev[conversationId] && prev[conversationId].length > 0) return prev;
+        return { ...prev, [conversationId]: messages };
+      });
+    };
+
     const onError = ({ message }: { message: string }) => {
       setError(message);
       setTimeout(() => setError(null), 4000);
@@ -85,6 +99,7 @@ export function useConversations(socket: Socket) {
     socket.on('conversation:created', onCreated);
     socket.on('conversation:closed', onClosed);
     socket.on('response', onResponse);
+    socket.on('conversation:history', onHistory);
     socket.on('conversation:error', onError);
 
     return () => {
@@ -96,6 +111,7 @@ export function useConversations(socket: Socket) {
       socket.off('conversation:created', onCreated);
       socket.off('conversation:closed', onClosed);
       socket.off('response', onResponse);
+      socket.off('conversation:history', onHistory);
       socket.off('conversation:error', onError);
     };
   }, [socket]);

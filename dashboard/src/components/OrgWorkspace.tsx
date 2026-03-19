@@ -10,8 +10,9 @@ import { CreateAgentModal } from './CreateAgentModal';
 import { ProposalBoard } from './ProposalBoard';
 import { BoardOfDirectors } from './BoardOfDirectors';
 import { OrgProtectionSettings } from './OrgProtectionSettings';
+import { WorkspaceTab } from './WorkspaceTab';
 
-type OrgSubTab = 'agents' | 'tickets' | 'board' | 'proposals' | 'activity' | 'memory' | 'settings';
+type OrgSubTab = 'agents' | 'tickets' | 'board' | 'workspace' | 'proposals' | 'activity' | 'memory' | 'settings';
 
 interface OrgWorkspaceProps {
   socket: Socket;
@@ -23,7 +24,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
     tickets, notifications, isAgentRunning,
     createOrg, updateOrg, deleteOrg,
     addAgent, updateAgent, deleteAgent, triggerAgent,
-    createTicket, updateTicket,
+    createTicket, updateTicket, activityItems,
   } = useOrgs(socket);
 
   const {
@@ -112,7 +113,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
           </div>
 
           <div className="org-subtabs">
-            {(['agents', 'tickets', 'board', 'proposals', 'activity', 'memory', 'settings'] as OrgSubTab[]).map(tab => (
+            {(['agents', 'tickets', 'board', 'workspace', 'proposals', 'activity', 'memory', 'settings'] as OrgSubTab[]).map(tab => (
               <button
                 key={tab}
                 className={`org-subtab ${subTab === tab ? 'active' : ''}`}
@@ -121,6 +122,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
                 {tab === 'agents' ? `Agents (${activeOrg.agents.length})`
                   : tab === 'tickets' ? `Tickets (${orgTickets.filter(t => t.status !== 'done').length})`
                   : tab === 'board' ? 'Board'
+                  : tab === 'workspace' ? 'Workspace'
                   : tab === 'proposals' ? 'Proposals'
                   : tab === 'activity' ? 'Activity'
                   : tab === 'settings' ? 'Settings'
@@ -136,12 +138,14 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
                   <AgentCard
                     key={agent.id}
                     agent={agent}
+                    allAgents={activeOrg.agents}
                     isRunning={isAgentRunning(activeOrg.id, agent.id)}
                     onTrigger={() => triggerAgent(activeOrg.id, agent.id)}
                     onChat={() => handleOpenChat(agent.id, agent.name, agent.role)}
                     onPause={() => updateAgent(activeOrg.id, agent.id, { paused: true })}
                     onResume={() => updateAgent(activeOrg.id, agent.id, { paused: false })}
                     onDelete={() => deleteAgent(activeOrg.id, agent.id)}
+                    onEdit={(updates) => updateAgent(activeOrg.id, agent.id, updates)}
                   />
                 ))}
                 <button className="agent-add-card" onClick={() => setShowCreateAgent(true)}>
@@ -163,6 +167,10 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
               <BoardOfDirectors orgId={activeOrg.id} orgName={activeOrg.name} agents={activeOrg.agents} socket={socket} />
             )}
 
+            {subTab === 'workspace' && (
+              <WorkspaceTab orgId={activeOrg.id} agents={activeOrg.agents} socket={socket} />
+            )}
+
             {subTab === 'proposals' && (
               <ProposalBoard orgId={activeOrg.id} socket={socket} />
             )}
@@ -170,17 +178,15 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
             {subTab === 'activity' && (
               <div className="org-activity-log">
                 <h3>Activity — {activeOrg.name}</h3>
-                {notifications.filter(n => n.orgId === activeOrg.id).length === 0
+                {activityItems.length === 0
                   ? <p className="empty-state">No activity yet.</p>
-                  : notifications
-                    .filter(n => n.orgId === activeOrg.id)
-                    .map((n, i) => (
-                      <div key={i} className={`org-notification org-notification--${n.level}`}>
+                  : [...activityItems].reverse().map((item, i) => (
+                      <div key={item.id ?? i} className="org-notification org-notification--info">
                         <div className="notif-header">
-                          <strong>{n.agentName}</strong>
-                          <span>{new Date(n.timestamp).toLocaleString()}</span>
+                          <strong>{item.type}</strong>
+                          <span>{new Date(item.timestamp).toLocaleString()}</span>
                         </div>
-                        <p>{n.message}</p>
+                        <p>{item.summary}</p>
                       </div>
                     ))
                 }

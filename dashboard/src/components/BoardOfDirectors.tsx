@@ -1,40 +1,35 @@
 import { useState, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { Blocker, CodeProposal, OrgAgent } from '../types/org';
+import type { Blocker, OrgAgent } from '../types/org';
 import { OrgChart } from './OrgChart';
-import { WorkspaceBrowser } from './WorkspaceBrowser';
 
 interface BoardOfDirectorsProps { orgId: string; orgName: string; agents: OrgAgent[]; socket: Socket; }
 
 export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDirectorsProps) {
   const [blockers, setBlockers] = useState<Blocker[]>([]);
-  const [proposals, setProposals] = useState<CodeProposal[]>([]);
   const [agentRuns, setAgentRuns] = useState<Record<string, any[]>>({});
   const [resolutionText, setResolutionText] = useState<Record<string, string>>({});
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
 
   useEffect(() => {
     socket.emit('org:blockers:list', { orgId });
-    socket.emit('org:proposals:list', { orgId });
     agents.forEach(a => socket.emit('org:agent:activity', { orgId, agentId: a.id }));
 
     const hb = (d: any) => { if (d.orgId === orgId) setBlockers(d.blockers ?? []); };
-    const hp = (d: any) => { if (d.orgId === orgId) setProposals(d.proposals ?? []); };
     const hbu = (d: any) => { if (d.orgId === orgId) socket.emit('org:blockers:list', { orgId }); };
-    const hpu = (d: any) => { if (d.orgId === orgId) socket.emit('org:proposals:list', { orgId }); };
     const ha = (d: any) => { if (d.orgId === orgId) setAgentRuns(prev => ({ ...prev, [d.agentId]: d.runs ?? [] })); };
 
-    socket.on('org:blockers:list', hb); socket.on('org:proposals:list', hp);
-    socket.on('org:blocker:update', hbu); socket.on('org:proposal:update', hpu);
+    socket.on('org:blockers:list', hb);
+    socket.on('org:blocker:update', hbu);
     socket.on('org:agent:activity', ha);
     return () => {
-      socket.off('org:blockers:list', hb); socket.off('org:proposals:list', hp);
-      socket.off('org:blocker:update', hbu); socket.off('org:proposal:update', hpu);
+      socket.off('org:blockers:list', hb);
+      socket.off('org:blocker:update', hbu);
       socket.off('org:agent:activity', ha);
     };
   }, [orgId, socket]);
 
   const openBlockers = blockers.filter(b => b.status === 'open');
-  const pendingProposals = proposals.filter(p => p.status === 'pending');
 
   const resolveBlocker = (blockerId: string) => {
     const r = resolutionText[blockerId];
@@ -59,10 +54,6 @@ export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDire
         <div className={`bod-summary-card ${openBlockers.length > 0 ? 'urgent' : ''}`}>
           <span className="bod-summary-count">{openBlockers.length}</span>
           <span className="bod-summary-label">Open Blockers</span>
-        </div>
-        <div className={`bod-summary-card ${pendingProposals.length > 0 ? 'attention' : ''}`}>
-          <span className="bod-summary-count">{pendingProposals.filter(p => p.status === 'pending').length}</span>
-          <span className="bod-summary-label">Pending Proposals</span>
         </div>
         <div className="bod-summary-card">
           <span className="bod-summary-count">{agents.filter(a => !a.paused && a.lastRunStatus === 'completed').length}</span>
@@ -100,27 +91,6 @@ export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDire
         </div>
       )}
 
-      {/* Pending Proposals */}
-      {pendingProposals.length > 0 && (
-        <div className="bod-section">
-          <h3 className="bod-section-title">Pending Code Proposals</h3>
-          {pendingProposals.map(p => (
-            <div key={p.id} className="bod-proposal-card">
-              <div className="bod-proposal-header">
-                <code>{p.relativePath}</code>
-                <span>{p.agentLabel}</span>
-                {p.isStale && <span className="proposal-stale-badge">Stale</span>}
-              </div>
-              <p>{p.explanation}</p>
-              <div className="bod-proposal-actions">
-                <button className="btn-approve" onClick={() => { if (confirm('Apply this change?')) socket.emit('org:proposal:approve', { orgId, proposalId: p.id }); }}>Approve</button>
-                <button className="btn-reject" onClick={() => socket.emit('org:proposal:reject', { orgId, proposalId: p.id })}>Reject</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Agent Health */}
       <div className="bod-section">
         <h3 className="bod-section-title">Agent Health</h3>
@@ -129,9 +99,15 @@ export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDire
             const runs = agentRuns[agent.id] ?? [];
             const lastRun = runs[runs.length - 1];
             const fileOps = runs.flatMap((r: any) => r.fileActivity ?? []).slice(-5);
+            const allFileOps = runs.flatMap((r: any) => r.fileActivity ?? []);
             const agentTokens = runs.reduce((s: number, r: any) => s + (r.estimatedTokens ?? 0), 0);
+            const isExpanded = expandedAgent === agent.id;
             return (
-              <div key={agent.id} className="bod-agent-health-card">
+              <div key={agent.id}
+                className={`bod-agent-health-card ${isExpanded ? 'expanded' : ''}`}
+                onClick={() => setExpandedAgent(isExpanded ? null : agent.id)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="bod-agent-header">
                   <strong>{agent.name}</strong>
                   <span className="bod-agent-role">{agent.role}</span>
@@ -145,8 +121,8 @@ export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDire
                   <div><span className="meta-label">Reports to</span> {agent.reportingTo ? agents.find(a => a.id === agent.reportingTo)?.name ?? '?' : 'Nobody'}</div>
                   <div><span className="meta-label">Est. tokens</span> {(agentTokens / 1000).toFixed(1)}K</div>
                 </div>
-                {lastRun && <div className="bod-last-run-summary">{lastRun.summary?.substring(0, 120)}...</div>}
-                {fileOps.length > 0 && (
+                {!isExpanded && lastRun && <div className="bod-last-run-summary">{lastRun.summary?.substring(0, 120)}...</div>}
+                {!isExpanded && fileOps.length > 0 && (
                   <div className="bod-file-ops">
                     {fileOps.map((op: any, i: number) => (
                       <div key={i} className="bod-file-op">
@@ -156,14 +132,57 @@ export function BoardOfDirectors({ orgId, orgName, agents, socket }: BoardOfDire
                     ))}
                   </div>
                 )}
+                {/* Expanded view: full details */}
+                {isExpanded && (
+                  <div className="bod-agent-expanded" onClick={e => e.stopPropagation()}>
+                    {lastRun && (
+                      <div className="bod-expanded-section">
+                        <h4>Last Run Summary</h4>
+                        <pre className="bod-expanded-pre">{lastRun.summary ?? 'No summary available.'}</pre>
+                        <div className="bod-expanded-meta">
+                          <span>Duration: {lastRun.durationMs ? `${(lastRun.durationMs / 1000).toFixed(1)}s` : 'N/A'}</span>
+                          <span>Trigger: {lastRun.trigger}</span>
+                          <span>Tokens: ~{lastRun.estimatedTokens ?? 0}</span>
+                        </div>
+                      </div>
+                    )}
+                    {allFileOps.length > 0 && (
+                      <div className="bod-expanded-section">
+                        <h4>All File Activity ({allFileOps.length} operations)</h4>
+                        <div className="bod-file-ops bod-file-ops--full">
+                          {allFileOps.map((op: any, i: number) => (
+                            <div key={i} className="bod-file-op">
+                              <span className={`file-op-badge file-op-${op.action}`}>{op.action}</span>
+                              <code>{op.path}</code>
+                              <span className="bod-file-op-time">{new Date(op.timestamp).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {runs.length > 1 && (
+                      <div className="bod-expanded-section">
+                        <h4>Run History ({runs.length} runs)</h4>
+                        <div className="bod-run-history">
+                          {[...runs].reverse().slice(0, 10).map((r: any, i: number) => (
+                            <div key={i} className="bod-run-entry">
+                              <span className="bod-run-trigger">{r.trigger}</span>
+                              <span>{new Date(r.startedAt).toLocaleString()}</span>
+                              <span>{r.durationMs ? `${(r.durationMs / 1000).toFixed(1)}s` : ''}</span>
+                              <span className="bod-run-summary-short">{r.summary?.substring(0, 80)}{r.summary?.length > 80 ? '...' : ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {!lastRun && <p className="empty-state">No runs recorded yet.</p>}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
-
-      {/* Workspace Browser */}
-      <WorkspaceBrowser orgId={orgId} socket={socket} />
     </div>
   );
 }

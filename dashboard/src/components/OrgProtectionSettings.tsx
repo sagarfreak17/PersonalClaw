@@ -10,6 +10,8 @@ export function OrgProtectionSettings({ org, socket }: OrgProtectionSettingsProp
   const [newPath, setNewPath] = useState('');
   const [saved, setSaved] = useState(false);
   const [gitCount, setGitCount] = useState(org.protection.gitFiles.length);
+  const [gitFiles, setGitFiles] = useState<string[]>(org.protection.gitFiles);
+  const [showAllFiles, setShowAllFiles] = useState(false);
 
   const save = (refreshGit = false) => {
     socket.emit('org:protection:update', {
@@ -17,7 +19,10 @@ export function OrgProtectionSettings({ org, socket }: OrgProtectionSettingsProp
     });
     if (refreshGit) {
       socket.once('org:updated', (updatedOrg: Org) => {
-        if (updatedOrg.id === org.id) setGitCount(updatedOrg.protection.gitFiles.length);
+        if (updatedOrg.id === org.id) {
+          setGitCount(updatedOrg.protection.gitFiles.length);
+          setGitFiles(updatedOrg.protection.gitFiles);
+        }
       });
     }
     setSaved(true);
@@ -31,6 +36,20 @@ export function OrgProtectionSettings({ org, socket }: OrgProtectionSettingsProp
   };
 
   const showManual = mode === 'manual' || mode === 'both';
+  const showGit = mode === 'git' || mode === 'both';
+
+  // Group git files by directory for display
+  const groupedFiles = (() => {
+    const groups: Record<string, string[]> = {};
+    for (const f of gitFiles) {
+      const parts = f.replace(/\\/g, '/').split('/');
+      const filename = parts.pop() ?? f;
+      const dir = parts.join('/') || '/';
+      if (!groups[dir]) groups[dir] = [];
+      groups[dir].push(filename);
+    }
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  })();
 
   return (
     <div className="protection-settings">
@@ -51,11 +70,35 @@ export function OrgProtectionSettings({ org, socket }: OrgProtectionSettingsProp
         ))}
       </div>
 
-      {(mode === 'git' || mode === 'both') && (
+      {showGit && (
         <div className="protection-git-info">
           <span>{gitCount} files from git snapshot</span>
           <button className="btn-refresh-git" onClick={() => save(true)}>Refresh from git</button>
           <span className="form-hint">Last updated: {new Date(org.protection.lastUpdated).toLocaleString()}</span>
+        </div>
+      )}
+
+      {showGit && gitFiles.length > 0 && (
+        <div className="protection-file-list-section">
+          <button
+            className="btn-sm"
+            onClick={() => setShowAllFiles(!showAllFiles)}
+            style={{ marginBottom: 8 }}
+          >
+            {showAllFiles ? 'Hide protected files' : `View all ${gitCount} protected files`}
+          </button>
+          {showAllFiles && (
+            <div className="protection-file-list" style={{ maxHeight: 400, overflow: 'auto', background: '#111', borderRadius: 6, padding: 12, fontSize: 12, fontFamily: 'monospace' }}>
+              {groupedFiles.map(([dir, files]) => (
+                <div key={dir} style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#60a5fa', fontWeight: 600, marginBottom: 2 }}>{dir}/</div>
+                  {files.map((f, i) => (
+                    <div key={i} style={{ paddingLeft: 16, color: '#d1d5db' }}>{f}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

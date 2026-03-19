@@ -1,9 +1,9 @@
-# PersonalClaw v12.0: End-User Guide 🛸
+# PersonalClaw v12.2: End-User Guide 🛸
 **Developed by Sagar Kalra**
 
 ![PersonalClaw Logo](assets/logo.png)
 
-Welcome to **PersonalClaw v12.0**, your next-generation AI agent for Windows. This version introduces **Autonomous AI Organisations**, allowing you to orchestrate entire teams of AI agents.
+Welcome to **PersonalClaw v12.2**, your next-generation AI agent for Windows. This version features **Autonomous AI Organisations** with workspace management, human feedback comments, and an expanded dashboard.
 
 ---
 
@@ -23,9 +23,9 @@ Wait a few seconds for initialization, then head to [http://localhost:5173](http
 
 ---
 
-## 🏢 AI Organisation System (NEW in v12)
+## 🏢 AI Organisation System (v12)
 
-PersonalClaw now supports creating autonomous AI companies that work on your projects without constant human intervention.
+PersonalClaw supports creating autonomous AI companies that work on your projects without constant human intervention.
 
 ### 1. Creating an Organisation
 - Click the **Organisations** tab in the sidebar.
@@ -39,6 +39,7 @@ Once an org is created, you can add multiple AI agents with specialized roles:
 - **Responsibilities**: List exactly what this agent is in charge of.
 - **Autonomy**: Set whether the agent can act freely (**Full**) or needs your consent (**Approval Required**).
 - **Heartbeat (Cron)**: Set a schedule for the agent to wake up and work (e.g., "Every 30 minutes" or "Every Monday at 9 AM").
+- **Reports To**: Set the agent's reporting line via the dropdown in the Edit Agent modal. Shows agent name and role for each option.
 
 ### 3. The Ticket Board (Kanban)
 Each organisation comes with a built-in task management system:
@@ -46,11 +47,36 @@ Each organisation comes with a built-in task management system:
 - **Status Tracking**: Move tasks between **Open**, **In Progress**, **Blocked**, and **Done**.
 - **Agent Collaboration**: Agents check the ticket board on every run to see what needs doing.
 
-### 4. Direct Agent Chat
+### 4. Board of Directors
+The **Board** tab is your org command center:
+- **Summary bar**: Open blockers, active agents, token usage at a glance.
+- **Org chart**: Visual hierarchy of agents and reporting lines.
+- **Blockers**: Resolve blockers that need human attention with resolution notes.
+- **Agent Health**: Click any agent health card to expand it and see full run summaries, all file activity, and run history.
+
+### 5. Workspace Tab
+The **Workspace** tab lets you browse and interact with files agents have created:
+- **Organised by agent role**: Each agent gets a collapsible section showing their files.
+- **Inline editor**: Click any file to view and edit it in a textarea editor.
+- **Human comments**: Leave comments on any file. When the agent runs next, your comments are injected into its system prompt so it can act on your feedback.
+- Comments are stored as sidecar `.comments.json` files (hidden from the file browser).
+
+### 6. Proposals Tab
+The **Proposals** tab shows only **code change proposals** — changes agents want to make to protected files.
+- Documents, plans, and hiring decisions are **auto-approved** and do not appear here.
+- Review the original vs proposed diff, then approve or reject.
+
+### 7. Direct Agent Chat
 Need to talk to a specific agent privately?
 - Click the **💬 Chat** icon on any agent card in the Org Workspace.
 - This opens a persistent, dedicated chat pane with just that agent.
 - Unlike the main command center, these agents remember who they are (CEO/Dev) and what they've been doing.
+
+### 8. Protection Settings
+The **Settings** tab lets you control which files agents must submit proposals to modify:
+- **Modes**: None (agents write freely), Git (all git-tracked files protected), Manual (specific paths), Both.
+- **View protected files**: Expand the "View all protected files" section to see every protected file, grouped by directory.
+- **Refresh from git**: Re-snapshot git-tracked files after you've added new files to the repo.
 
 ---
 
@@ -118,7 +144,10 @@ PersonalClaw evolves by learning from your conversations.
 ---
 
 ## 🗄️ Where is my data?
+- **Organisations**: `\orgs\{org-name}\` (Org config, agent memory, workspace, tickets, proposals, blockers, notifications).
+- **Workspace files**: `\orgs\{org-name}\workspace\` (Agent-created files, reports, comments sidecar files).
 - **Logs**: `\memory\session_TIMESTAMP.json` (Full chat records).
+- **Activity feed**: `\logs\activity.jsonl` (Persisted activity feed, auto-trimmed to 1000 entries).
 - **Screenshots**: `\screenshots\` (Historical visual captures).
 - **Documentation**: `\docs\` (This guide and technical specs).
 

@@ -92,6 +92,42 @@ function buildOrgAgentSystemPrompt(org: Org, agent: OrgAgent): string {
     .map(a => `- ${a.name} (${a.role}) — ID: ${a.id}`)
     .join('\n') || 'None yet.';
 
+  // Load unread comments on files this agent created
+  let commentsFeedback = '';
+  try {
+    const roleSlug = agent.role.toLowerCase().replace(/\s+/g, '-');
+    const agentLabel = `${agent.name} (${agent.role})`;
+    const walkForComments = (dir: string, rel: string): string[] => {
+      const results: string[] = [];
+      if (!fs.existsSync(dir)) return results;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.endsWith('.comments.json')) {
+          const targetFile = entry.name.replace('.comments.json', '');
+          const targetLC = targetFile.toLowerCase();
+          // Check if this file belongs to this agent
+          if (targetLC.startsWith(roleSlug + '-') || targetLC.includes('/' + roleSlug + '-')) {
+            const commentsPath = path.join(dir, entry.name);
+            const comments = JSON.parse(fs.readFileSync(commentsPath, 'utf-8'));
+            const unread = comments.filter((c: any) => !c.read);
+            if (unread.length > 0) {
+              results.push(`File: ${rel ? rel + '/' : ''}${targetFile}\n${unread.map((c: any) => `  - [${c.author}] ${c.text}`).join('\n')}`);
+              // Mark as read
+              for (const c of comments) c.read = true;
+              fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2));
+            }
+          }
+        } else if (entry.isDirectory() && entry.name !== 'proposals') {
+          results.push(...walkForComments(path.join(dir, entry.name), (rel ? rel + '/' : '') + entry.name));
+        }
+      }
+      return results;
+    };
+    const commentItems = walkForComments(org.workspaceDir, '');
+    if (commentItems.length > 0) {
+      commentsFeedback = `\n\n## Human Comments on Your Files\nThe human owner has left feedback on files you created. Review and act on these:\n${commentItems.join('\n\n')}`;
+    }
+  } catch { /* ignore comment loading errors */ }
+
   const now = new Date().toLocaleString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
@@ -149,12 +185,14 @@ You have just been activated. Follow this sequence every single run:
 1. **Read your memory** — use \`org_read_agent_memory\` to recall what you were working on.
 2. **Check shared memory** — use \`org_read_shared_memory\` for company-wide context.
 3. **Review your tickets** — use \`org_list_tickets\` with \`assignedToMe: true\`.
-4. **Decide and act** — based on your goals, responsibilities, and task queue, do the most important work. Use all available tools including file system, browser, code execution, and org tools.
-5. **Update tickets** — use \`org_update_ticket\` to mark progress or completion.
-6. **Delegate if needed** — use \`org_delegate\` to assign work to colleagues.
-7. **Write a report** — use \`org_write_report\` to document what you did this session.
-8. **Notify if important** — use \`org_notify\` for anything the human owner should know.
-9. **Save your memory** — ALWAYS call \`org_write_agent_memory\` at the end. Never skip this.
+4. **Create tickets BEFORE doing any work** — Before executing any task, create a ticket for it using \`org_create_ticket\`. Assign it to yourself (use your own agent ID as \`assigneeId\`). Move it to \`in_progress\` using \`org_update_ticket\`. Complete the work. Then mark it \`done\`. This applies to ALL work — research, writing documents, delegating, strategy, anything. No work without a ticket.
+5. **Do the work** — based on your goals, responsibilities, and task queue, do the most important work. Use all available tools including file system, browser, code execution, and org tools.
+6. **Update tickets** — use \`org_update_ticket\` to mark progress or completion.
+7. **Submit major outputs for review** — After completing significant work — writing a strategy document, making a hiring decision, creating a pricing plan, or any output meant for the human owner — call \`org_submit_for_review\` with the content and type. Major decisions that affect the business direction require \`requiresApproval: true\`. Routine outputs like status reports use \`requiresApproval: false\`.
+8. **Delegate if needed** — use \`org_delegate\` to assign work to colleagues.
+9. **Write a report** — use \`org_write_report\` to document what you did this session.
+10. **Notify if important** — use \`org_notify\` for anything the human owner should know.
+11. **Save your memory** — ALWAYS call \`org_write_agent_memory\` at the end. Never skip this.
 
 ## Autonomy
 ${agent.autonomyLevel === 'full'
@@ -181,7 +219,7 @@ Your primary workspace is \`${org.rootDir}\`. You have full read/write access he
   disabled for org agents to protect the codebase. Use \`org_propose_code_change\` for code
   changes and \`manage_files\` for reading project files.
 - Call \`org_write_agent_memory\` at the end of EVERY run — even if you did nothing.
-- Keep your reports concise and actionable.`;
+- Keep your reports concise and actionable.${commentsFeedback}`;
 }
 
 // ─── Brain Factory & Interceptors ─────────────────────────────────
@@ -199,6 +237,13 @@ async function orgAwareHandleToolCall(
   org: Org, agent: OrgAgent, activityLog: FileActivityEntry[]
 ): Promise<any> {
   const { handleToolCall } = await import('../skills/index.js');
+
+  // Check org skills first — these are not registered in the global skill index
+  const orgSkill = orgSkills.find(s => s.name === name);
+  if (orgSkill) {
+    return orgSkill.run(args, meta);
+  }
+
   const WRITE_SKILLS = new Set(['manage_files', 'manage_pdf']);
   const WRITE_ACTIONS = new Set(['write', 'append', 'create', 'merge', 'split', 'rotate', 'watermark', 'extract_pages']);
 

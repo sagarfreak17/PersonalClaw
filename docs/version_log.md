@@ -2,6 +2,54 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.2.0] - 2026-03-19
+
+### Dashboard Overhaul & Workspace System
+
+#### Edit Agent — Reports To Dropdown
+- Edit Agent modal now includes a "Reports To" dropdown listing all other agents in the org (name + role)
+- Current agent excluded from the list; selecting "Nobody" clears the reporting line
+- Agent cards now show the actual manager name instead of just "Set"
+
+#### Notification Null Guard Fix
+- Fixed `[undefined] undefined: Proposed change to undefined` toast errors
+- Root cause: `org:proposal:created` event handler was spreading proposal fields directly as notification fields, missing `orgName` and `agentName`
+- Added null guards to all notification emission points: `org:proposal:created`, `org:blocker:created`, `org:notification`, and `formatActivitySummary`
+- All notification fields now have fallback values
+
+#### Proposals Tab — Code Only
+- Proposals tab now filters to show only code change proposals (no `submissionType`)
+- Documents, plans, and hiring decisions are auto-approved when `org_submit_for_review` is called (unless `requiresApproval: true` is explicitly set)
+- Auto-approved submissions stored with `status: 'approved'`, `resolvedBy: 'auto'`
+
+#### New Workspace Tab
+- New tab between Board and Activity in the org workspace
+- Files organised by agent role — each agent gets a collapsible section showing files they created (matched by role slug prefix in filenames)
+- Inline file editor — click any file to open a textarea editor with save functionality
+- Human comment system — leave comments on any file via input below the editor
+- Comments stored as sidecar `{filename}.comments.json` files in the same directory
+- Sidecar files automatically hidden from workspace file listings
+- Agent system prompt injection — unread comments on agent's files are included in the next run's system prompt, then marked as read
+- Path traversal protection — file read/write validates paths are within the workspace directory
+- 6 new socket events: `org:workspace:files:all`, `org:workspace:file:read`, `org:workspace:file:write`, `org:workspace:file:comment`, `org:workspace:file:comments:read`, `org:workspace:file:content`
+
+#### Board Tab Improvements
+- Agent health cards are now clickable — expand on click to show full run summary, all file activity with timestamps, and run history (last 10 runs)
+- Removed "Pending Code Proposals" section (proposals have their own tab)
+- Removed workspace browser from Board (workspace has its own tab)
+
+#### Git Protection Fix
+- `snapshotGitFiles()` in `updateProtection()` now runs from `org.rootDir` instead of `org.workspaceDir`
+- Fixes incorrect file count (0 files) when rootDir differs from workspaceDir
+
+#### Protection Settings Visibility
+- Settings tab now shows a "View all protected files" expandable section when git/both mode is active
+- Files displayed in a scrollable code block, grouped by directory
+- File count shown in the header
+- Git file list updates when "Refresh from git" is clicked
+
+---
+
 ## [12.0.0] - 2026-03-18
 
 ### Autonomous AI Company Orchestration System

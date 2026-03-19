@@ -129,8 +129,9 @@ class OrgManager {
     fs.mkdirSync(workspaceDir, { recursive: true });
 
     const mode: ProtectionMode = params.protectionMode ?? 'git';
+    const rootDir = workspaceDir; // rootDir = workspaceDir on create
     const gitFiles = (mode === 'git' || mode === 'both')
-      ? snapshotGitFiles(workspaceDir)
+      ? snapshotGitFiles(rootDir)
       : [];
     const manualPaths = (mode === 'manual' || mode === 'both')
       ? (params.manualPaths ?? [])
@@ -277,7 +278,7 @@ class OrgManager {
     if (params.manualPaths !== undefined) org.protection.manualPaths = params.manualPaths;
 
     if (params.refreshGit || (params.mode && (params.mode === 'git' || params.mode === 'both'))) {
-      org.protection.gitFiles = snapshotGitFiles(org.workspaceDir);
+      org.protection.gitFiles = snapshotGitFiles(org.rootDir);
       console.log(`[OrgManager] Git snapshot refreshed for ${org.name}: ${org.protection.gitFiles.length} files`);
     }
 

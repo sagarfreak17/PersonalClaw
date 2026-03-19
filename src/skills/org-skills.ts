@@ -329,9 +329,9 @@ export const orgNotifySkill: Skill = {
     
     eventBus.dispatch('org:notification', {
       orgId: meta.orgId,
-      orgName: org?.name,
+      orgName: org?.name ?? 'Unknown',
       agentName: agent ? `${agent.name} (${agent.role})` : 'Unknown',
-      message: args.message,
+      message: args.message ?? '',
       level: args.level ?? 'info',
       timestamp: Date.now()
     }, 'org-skills');
@@ -423,6 +423,68 @@ export const orgRaiseBlockerSkill: Skill = {
   },
 };
 
+// ─── org_submit_for_review ─────────────────────────────────────────
+export const orgSubmitForReviewSkill: Skill = {
+  name: 'org_submit_for_review',
+  description: 'Submit significant work output for human review. Use for strategy documents, hiring decisions, pricing plans, or any major output the human owner should see in the Proposals tab.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Short title for this submission.' },
+      content: { type: 'string', description: 'The full content of the submission — document text, decision rationale, plan details, etc.' },
+      type: { type: 'string', enum: ['plan', 'decision', 'document', 'hiring'], description: 'Category of submission.' },
+      requiresApproval: { type: 'boolean', description: 'True for major decisions that affect business direction. False for routine outputs.' },
+    },
+    required: ['title', 'content', 'type'],
+  },
+  run: async (args: any, meta: SkillMeta) => {
+    if (!meta.orgId || !meta.orgAgentId) return { error: 'Not running in org context' };
+    const org = orgManager.get(meta.orgId);
+    if (!org) return { error: 'Org not found' };
+    const agent = org.agents.find(a => a.id === meta.orgAgentId);
+    const agentLabel = agent ? `${agent.name} (${agent.role})` : meta.orgAgentId;
+
+    const submissionType = args.type as 'plan' | 'decision' | 'document' | 'hiring';
+    // Auto-approve documents, plans, and hiring — they don't need human approval
+    const autoApprove = ['document', 'plan', 'hiring'].includes(submissionType) && !(args.requiresApproval === true);
+    const submission = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      orgId: meta.orgId,
+      agentId: meta.orgAgentId,
+      agentLabel,
+      title: args.title,
+      content: args.content,
+      submissionType,
+      requiresApproval: args.requiresApproval ?? false,
+      status: (autoApprove ? 'approved' : 'pending') as 'pending' | 'approved',
+      isStale: false,
+      createdAt: new Date().toISOString(),
+      resolvedAt: autoApprove ? new Date().toISOString() : null,
+      resolvedBy: autoApprove ? 'auto' : null,
+    };
+
+    // Store alongside code proposals in proposals.json
+    const proposalsFile = path.join(org.orgDir, 'proposals.json');
+    const existing = fs.existsSync(proposalsFile)
+      ? JSON.parse(fs.readFileSync(proposalsFile, 'utf-8'))
+      : [];
+    existing.push(submission);
+    const tmp = proposalsFile + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(existing, null, 2));
+    fs.renameSync(tmp, proposalsFile);
+
+    // Also store content on disk like code proposals
+    const submissionDir = path.join(org.workspaceDir, 'proposals', submission.id);
+    fs.mkdirSync(submissionDir, { recursive: true });
+    fs.writeFileSync(path.join(submissionDir, 'proposed.txt'), args.content);
+    fs.writeFileSync(path.join(submissionDir, 'original.txt'), '(no original — new submission)');
+    fs.writeFileSync(path.join(submissionDir, 'submission.json'), JSON.stringify(submission, null, 2));
+
+    eventBus.dispatch('org:proposal:created', { proposal: submission }, 'org-skills');
+    return { success: true, submission };
+  },
+};
+
 export const orgSkills: Skill[] = [
   orgReadAgentMemorySkill,
   orgWriteAgentMemorySkill,
@@ -436,4 +498,5 @@ export const orgSkills: Skill[] = [
   orgNotifySkill,
   orgProposeCodeChangeSkill,
   orgRaiseBlockerSkill,
+  orgSubmitForReviewSkill,
 ];

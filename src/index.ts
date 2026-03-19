@@ -209,7 +209,7 @@ function formatActivitySummary(event: any): string {
     case Events.ORG_AGENT_RUN_FAILED: return `Agent run failed: ${event.data?.agentId} — ${event.data?.error}`;
     case Events.ORG_TICKET_CREATED: return `Ticket created: ${event.data?.ticket?.title}`;
     case Events.ORG_TICKET_UPDATED: return `Ticket updated: ${event.data?.ticket?.title}`;
-    case 'org:notification': return `[${event.data?.orgName}] ${event.data?.agentName}: ${event.data?.message}`;
+    case 'org:notification': return `[${event.data?.orgName ?? 'Org'}] ${event.data?.agentName ?? 'Agent'}: ${event.data?.message ?? ''}`;
     default: return event.type;
   }
 }
@@ -296,8 +296,21 @@ eventBus.on(Events.ORG_TICKET_UPDATED, (event: any) => {
 // Proposals
 eventBus.on('org:proposal:created', (event: any) => {
   const data = event.data ?? event;
-  io.emit('org:proposal:update', { orgId: data.proposal.orgId });
-  io.emit('org:notification', { ...data.proposal, message: `Proposed change to \`${data.proposal.relativePath}\``, level: 'warning', type: 'proposal', timestamp: Date.now() });
+  const proposal = data.proposal ?? {};
+  io.emit('org:proposal:update', { orgId: proposal.orgId });
+  const org = orgManager.get(proposal.orgId);
+  const label = proposal.relativePath
+    ? `Proposed change to \`${proposal.relativePath}\``
+    : `Submitted for review: ${proposal.title ?? 'Untitled'}`;
+  io.emit('org:notification', {
+    orgId: proposal.orgId,
+    orgName: org?.name ?? 'Unknown',
+    agentName: proposal.agentLabel ?? 'Unknown',
+    message: label,
+    level: 'warning',
+    type: 'proposal',
+    timestamp: Date.now(),
+  });
 });
 eventBus.on('org:proposal:approved', (event: any) => io.emit('org:proposal:update', { orgId: (event.data ?? event).proposal.orgId }));
 eventBus.on('org:proposal:rejected', (event: any) => io.emit('org:proposal:update', { orgId: (event.data ?? event).proposal.orgId }));
@@ -305,9 +318,12 @@ eventBus.on('org:proposal:rejected', (event: any) => io.emit('org:proposal:updat
 // Blockers
 eventBus.on('org:blocker:created', (event: any) => {
   const data = event.data ?? event;
-  io.emit('org:blocker:update', { orgId: data.blocker.orgId });
-  io.emit('org:notification', { orgId: data.blocker.orgId, orgName: orgManager.get(data.blocker.orgId)?.name, agentName: data.blocker.agentLabel, message: `🚧 ${data.blocker.title}`, level: 'error', type: 'blocker', timestamp: Date.now() });
-  storeNotification({ orgId: data.blocker.orgId, orgName: orgManager.get(data.blocker.orgId)?.name ?? '', agentName: data.blocker.agentLabel, message: `🚧 ${data.blocker.title}: ${data.blocker.humanActionRequired}`, level: 'error', type: 'blocker', timestamp: Date.now() });
+  const blocker = data.blocker ?? {};
+  const orgName = orgManager.get(blocker.orgId)?.name ?? 'Unknown';
+  const agentName = blocker.agentLabel ?? 'Unknown';
+  io.emit('org:blocker:update', { orgId: blocker.orgId });
+  io.emit('org:notification', { orgId: blocker.orgId, orgName, agentName, message: `🚧 ${blocker.title ?? 'Blocker'}`, level: 'error', type: 'blocker', timestamp: Date.now() });
+  storeNotification({ orgId: blocker.orgId, orgName, agentName, message: `🚧 ${blocker.title ?? 'Blocker'}: ${blocker.humanActionRequired ?? ''}`, level: 'error', type: 'blocker', timestamp: Date.now() });
 });
 eventBus.on('org:blocker:update', (event: any) => io.emit('org:blocker:update', { orgId: (event.data ?? event).orgId }));
 
@@ -678,7 +694,116 @@ io.on('connection', (socket) => {
     } catch { socket.emit('org:agent:activity', { runs: [] }); }
   });
   
-  // Workspace file browser
+  // Workspace file browser — all files recursively (for Workspace tab)
+  socket.on('org:workspace:files:all', (params: { orgId: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:workspace:files:all', { orgId: params.orgId, files: [] });
+      const allFiles: any[] = [];
+      const walk = (dir: string, rel: string) => {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          // Skip comments sidecar files and proposals directory
+          if (entry.name.endsWith('.comments.json')) continue;
+          if (entry.name === 'proposals' && rel === '') continue;
+          const entryPath = (rel ? rel + '/' : '') + entry.name;
+          if (entry.isDirectory()) {
+            walk(path.join(dir, entry.name), entryPath);
+          } else {
+            try {
+              const stat = fs.statSync(path.join(dir, entry.name));
+              allFiles.push({
+                name: entry.name,
+                isDir: false,
+                path: entryPath,
+                size: stat.size,
+                modified: stat.mtime.toISOString(),
+              });
+            } catch { /* skip unreadable files */ }
+          }
+        }
+      };
+      walk(org.workspaceDir, '');
+      socket.emit('org:workspace:files:all', { orgId: params.orgId, files: allFiles });
+    } catch (e: any) { socket.emit('org:error', { message: e.message }); }
+  });
+
+  // Workspace file read
+  socket.on('org:workspace:file:read', (params: { orgId: string; path: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:workspace:file:content', { orgId: params.orgId, path: params.path, error: 'Org not found' });
+      const filePath = path.join(org.workspaceDir, params.path);
+      // Security: ensure path is within workspace
+      const resolved = path.resolve(filePath);
+      const wsResolved = path.resolve(org.workspaceDir);
+      if (!resolved.startsWith(wsResolved)) {
+        return socket.emit('org:workspace:file:content', { orgId: params.orgId, path: params.path, error: 'Access denied: path outside workspace' });
+      }
+      if (!fs.existsSync(filePath)) {
+        return socket.emit('org:workspace:file:content', { orgId: params.orgId, path: params.path, error: 'File not found' });
+      }
+      const content = fs.readFileSync(filePath, 'utf-8');
+      socket.emit('org:workspace:file:content', { orgId: params.orgId, path: params.path, content });
+    } catch (e: any) {
+      socket.emit('org:workspace:file:content', { orgId: params.orgId, path: params.path, error: e.message });
+    }
+  });
+
+  // Workspace file write
+  socket.on('org:workspace:file:write', (params: { orgId: string; path: string; content: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:workspace:file:saved', { orgId: params.orgId, error: 'Org not found' });
+      const filePath = path.join(org.workspaceDir, params.path);
+      const resolved = path.resolve(filePath);
+      const wsResolved = path.resolve(org.workspaceDir);
+      if (!resolved.startsWith(wsResolved)) {
+        return socket.emit('org:workspace:file:saved', { orgId: params.orgId, error: 'Access denied' });
+      }
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, params.content, 'utf-8');
+      socket.emit('org:workspace:file:saved', { orgId: params.orgId, path: params.path, success: true });
+    } catch (e: any) {
+      socket.emit('org:workspace:file:saved', { orgId: params.orgId, error: e.message });
+    }
+  });
+
+  // Workspace file comments — read
+  socket.on('org:workspace:file:comments:read', (params: { orgId: string; path: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:workspace:file:comments', { orgId: params.orgId, path: params.path, comments: [] });
+      const commentsFile = path.join(org.workspaceDir, params.path + '.comments.json');
+      const comments = fs.existsSync(commentsFile) ? JSON.parse(fs.readFileSync(commentsFile, 'utf-8')) : [];
+      socket.emit('org:workspace:file:comments', { orgId: params.orgId, path: params.path, comments });
+    } catch {
+      socket.emit('org:workspace:file:comments', { orgId: params.orgId, path: params.path, comments: [] });
+    }
+  });
+
+  // Workspace file comments — add
+  socket.on('org:workspace:file:comment', (params: { orgId: string; path: string; text: string; author: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return;
+      const commentsFile = path.join(org.workspaceDir, params.path + '.comments.json');
+      const existing = fs.existsSync(commentsFile) ? JSON.parse(fs.readFileSync(commentsFile, 'utf-8')) : [];
+      existing.push({
+        author: params.author,
+        text: params.text,
+        timestamp: new Date().toISOString(),
+        read: false,
+      });
+      fs.writeFileSync(commentsFile, JSON.stringify(existing, null, 2));
+      socket.emit('org:workspace:file:comments', { orgId: params.orgId, path: params.path, comments: existing });
+    } catch (e: any) {
+      socket.emit('org:error', { message: e.message });
+    }
+  });
+
+  // Original workspace directory browser
   socket.on('org:workspace:list', (params: { orgId: string; subdir?: string }) => {
     try {
       const org = orgManager.get(params.orgId);

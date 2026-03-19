@@ -14,7 +14,8 @@ PersonalClaw is a local-first AI automation platform for Windows, integrating Ge
 - `/docs`: Project documentation, including standard user/setup guides, the `ARCHITECTURE.md` spec, and historical/roadmap data in `docs/Updates/`.
 - `/extension`: Chrome extension for relaying data to the backend.
 - `/scripts`: Utility scripts for automation and setup.
-- `/memory`: (Hidden/Local) Persistent data including sessions, knowledge, and **v12 Org data** (`memory/orgs/`).
+- `/orgs`: Persistent org data directories (one per organisation — `org.json`, `workspace/`, `agents/`, `proposals.json`, `tickets.json`, `blockers.json`, etc.).
+- `/memory`: (Hidden/Local) Persistent data including sessions and knowledge.
 
 ---
 
@@ -29,16 +30,22 @@ PersonalClaw/
 │   │   ├── assets
 │   │   │   └── react.svg
 │   │   ├── components
-│   │   │   ├── AgentCard.tsx
-│   │   │   ├── AgentChatPane.tsx
+│   │   │   ├── AgentCard.tsx              # Agent status card + EditAgentModal (with Reports To dropdown)
+│   │   │   ├── AgentChatPane.tsx          # Direct agent chat interface
+│   │   │   ├── BoardOfDirectors.tsx       # Org command center — summary, org chart, blockers, expandable agent health
 │   │   │   ├── ChatInput.tsx
 │   │   │   ├── ChatWorkspace.tsx
 │   │   │   ├── ConversationPane.tsx
 │   │   │   ├── CreateAgentModal.tsx
 │   │   │   ├── CreateOrgModal.tsx
-│   │   │   ├── OrgWorkspace.tsx
+│   │   │   ├── OrgChart.tsx               # Hierarchical org agent visualisation
+│   │   │   ├── OrgProtectionSettings.tsx  # File protection config with protected file list viewer
+│   │   │   ├── OrgWorkspace.tsx           # Main org workspace with 8 tabs
+│   │   │   ├── ProposalBoard.tsx          # Code change proposals only (non-code auto-approved)
 │   │   │   ├── TicketBoard.tsx
-│   │   │   └── WorkerCard.tsx
+│   │   │   ├── WorkerCard.tsx
+│   │   │   ├── WorkspaceBrowser.tsx       # Directory tree file browser
+│   │   │   └── WorkspaceTab.tsx           # Workspace tab — files by agent role, inline editor, comments
 │   │   ├── hooks
 │   │   │   ├── useAgents.ts
 │   │   │   ├── useConversations.ts
@@ -67,8 +74,12 @@ PersonalClaw/
 │   ├── Updates
 │   │   ├── PersonalClaw_v11_Implementation_Plan_FINAL.md
 │   │   ├── PersonalClaw_v12_Implementation_Plan_FINAL_v2.md
-│   │   └── V10_FEATURES.md
+│   │   ├── V10_FEATURES.md
+│   │   ├── PersonalClaw_v12.1_Implementation_Plan_FINAL_v2.md
+│   │   ├── PersonalClaw_v12.1_Protection_Patch.md
+│   │   └── PersonalClaw_Logging_Patch.md
 │   ├── ARCHITECTURE.md
+│   ├── DIR_STRUCTURE.md
 │   ├── SETUP_GUIDE.md
 │   ├── USER_GUIDE.md
 │   └── version_log.md
@@ -95,9 +106,11 @@ PersonalClaw/
 │   │   ├── events.ts
 │   │   ├── learner.ts
 │   │   ├── mcp.ts
-│   │   ├── org-agent-runner.ts
+│   │   ├── org-agent-runner.ts       # Agent execution with human comment injection
+│   │   ├── org-file-guard.ts         # Per-org file protection, proposal CRUD
 │   │   ├── org-heartbeat.ts
 │   │   ├── org-manager.ts
+│   │   ├── org-notification-store.ts  # Persistent notification store + Telegram
 │   │   ├── org-task-board.ts
 │   │   ├── relay.ts
 │   │   ├── sessions.ts

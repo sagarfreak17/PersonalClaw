@@ -2,24 +2,24 @@
 
 Welcome, Agent. You are a PersonalClaw agent operating within the PersonalClaw codebase - a local-first AI automation platform for Windows.
 
-## Project Structure (v12)
+## Project Structure (v12.2)
 
 ```
 PersonalClaw/
 +-- src/                         # TypeScript backend (Express + Socket.io + Gemini AI)
-|   +-- index.ts                 # Server entry point — multi-chat + Org wiring
+|   +-- index.ts                 # Server entry point — multi-chat + Org wiring + workspace handlers
 |   +-- core/                    # Core systems
 |   |   +-- brain.ts             # Brain class — Gemini integration, persona injection
-|   |   +-- events.ts            # Event Bus — typed events, 40+ constants
+|   |   +-- events.ts            # Event Bus — typed events, 45+ constants
 |   |   +-- skill-lock.ts        # Skill Lock Manager — concurrent resource protection
 |   |   +-- agent-registry.ts    # Agent Registry — worker lifecycle
 |   |   +-- conversation-manager.ts  # Conversation Manager — human chat panes
 |   |   +-- org-manager.ts       # Org Manager — org/agent CRUD + persistence
 |   |   +-- org-heartbeat.ts     # Heartbeat Engine — cron + event triggers
 |   |   +-- org-task-board.ts    # Task Board — ticketing system per org
-|   |   +-- org-agent-runner.ts  # Agent Runner — executes autonomous agents
-|   |   +-- org-skills.ts        # Org-specific tools (tickets, memory, delegate)
-|   |   +-- org-management-skill.ts # Human tools for org management
+|   |   +-- org-agent-runner.ts  # Agent Runner — executes autonomous agents, injects human comments
+|   |   +-- org-file-guard.ts    # Per-org file protection, proposal creation/approval
+|   |   +-- org-notification-store.ts # Persistent notifications + Telegram with rate limits
 |   |   +-- telegram-brain.ts    # Isolated Telegram Brain instance
 |   |   +-- sessions.ts          # Session Manager
 |   |   +-- audit.ts             # Audit Logger
@@ -29,6 +29,8 @@ PersonalClaw/
 |   |   +-- relay.ts             # Extension Relay bridge
 |   +-- skills/                  # Core tool modules
 |   |   +-- index.ts             # Skill registry
+|   |   +-- org-skills.ts        # Org-specific tools (13 skills: tickets, memory, delegate, proposals, etc.)
+|   |   +-- org-management-skill.ts # Human tools for org management
 |   |   +-- shell.ts / files.ts / etc. (15 base skills)
 |   +-- interfaces/
 |   |   +-- telegram.ts          # Telegram bot
@@ -38,13 +40,19 @@ PersonalClaw/
 |   +-- src/
 |       +-- App.tsx              # Main dashboard + Sidebar + Tabs
 |       +-- components/
-|       |   +-- ChatWorkspace.tsx     # Human command center
-|       |   +-- OrgWorkspace.tsx      # Autonomous org dashboard
-|       |   +-- AgentCard.tsx         # Agent status & chat trigger
-|       |   +-- TicketBoard.tsx       # Kanban task board
-|       |   +-- AgentChatPane.tsx     # Direct persistent agent chat
-|       |   +-- ConversationPane.tsx  # Legacy/Main chat pane
-|       |   +-- WorkerCard.tsx        # Worker status card
+|       |   +-- ChatWorkspace.tsx        # Human command center
+|       |   +-- OrgWorkspace.tsx         # Autonomous org dashboard (8 tabs)
+|       |   +-- AgentCard.tsx            # Agent status + EditAgentModal (Reports To dropdown)
+|       |   +-- BoardOfDirectors.tsx     # Org command center — expandable agent health cards
+|       |   +-- OrgChart.tsx             # Hierarchical org agent visualisation
+|       |   +-- ProposalBoard.tsx        # Code change proposals only
+|       |   +-- WorkspaceTab.tsx         # Files by agent role, inline editor, comments
+|       |   +-- WorkspaceBrowser.tsx     # Directory tree file browser
+|       |   +-- OrgProtectionSettings.tsx # Protection config + protected file list viewer
+|       |   +-- TicketBoard.tsx          # Kanban task board
+|       |   +-- AgentChatPane.tsx        # Direct persistent agent chat
+|       |   +-- ConversationPane.tsx     # Legacy/Main chat pane
+|       |   +-- WorkerCard.tsx           # Worker status card
 |       +-- hooks/
 |       |   +-- useConversations.ts   # Human chat state
 |       |   +-- useOrgs.ts            # Org & heartbeats state
@@ -52,14 +60,22 @@ PersonalClaw/
 |       |   +-- useAgents.ts          # Agent registry state
 |       +-- types/
 |           +-- conversation.ts / org.ts
-+-- docs/                        # Project documentation (v12 Plans, Guides)
-+-- memory/                      # Persistent data
-|   +-- orgs/                    # Org configs, agents, tickets, memory
++-- orgs/                        # Persistent org data (one dir per org)
+|   +-- {org-name-shortid}/
+|       +-- org.json             # Org config + agents
+|       +-- workspace/           # Agent working directory
+|       +-- agents/{agentId}/    # Per-agent memory + run logs
+|       +-- proposals.json       # Code proposals + review submissions
+|       +-- tickets.json         # Task board
+|       +-- blockers.json        # Open blockers
+|       +-- notifications.jsonl  # Stored notifications
++-- docs/                        # Project documentation
++-- memory/                      # Persistent data (sessions, knowledge)
 +-- scripts/                     # Utility scripts
 +-- extension/                   # Chrome extension
 ```
 
-## Technical Architecture (v12)
+## Technical Architecture (v12.2)
 
 ```mermaid
 graph TD
@@ -101,9 +117,12 @@ PersonalClaw runs a **multi-turn tool execution loop**:
 1. Human or Heartbeat triggers an agent.
 2. If Heartbeat: OrgAgentRunner creates a Brain with **Persona Injection** (Mission + Role).
 3. Brain checks Task Board and Memory, then builds a Plan.
-4. Tools execute via `handleToolCall`, acquiring global/per-path locks.
-5. Loop repeats until the agent has achieved its run goals or delegates.
-6. Run summary is recorded and session history is saved.
+4. **Human comments** on workspace files are injected into the system prompt so agents can act on feedback.
+5. Tools execute via `handleToolCall`, acquiring global/per-path locks.
+6. Protected file writes are intercepted and routed to the proposal system.
+7. Non-code submissions (documents, plans, hiring) are auto-approved unless `requiresApproval: true`.
+8. Loop repeats until the agent has achieved its run goals or delegates.
+9. Run summary is recorded and session history is saved.
 
 ---
 

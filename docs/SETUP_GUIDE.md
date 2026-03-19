@@ -1,6 +1,6 @@
-# 🏁 First-Time Setup Guide: PersonalClaw v12.0
+# 🏁 First-Time Setup Guide: PersonalClaw v12.2
 
-Welcome to PersonalClaw v12.0! This version introduces **Autonomous AI Organisations**. Follow these steps to get running.
+Welcome to PersonalClaw v12.2! This version features **Autonomous AI Organisations** with workspace file management, human comment feedback, and expanded dashboard controls. Follow these steps to get running.
 
 ---
 
@@ -70,7 +70,11 @@ Install the **PersonalClaw Relay** Chrome extension to let the agent interact wi
 ## 🛡️ Usage Tips
 - **Security**: This agent can execute PowerShell commands. Never share your `.env` file!
 - **Organisations**: Use the Org Workspace to manage autonomous teams.
+- **Workspace**: Use the Workspace tab to browse files by agent, edit them, and leave comments for agents to act on.
+- **Proposals**: Only code changes appear in the Proposals tab. Documents, plans, and hiring decisions are auto-approved.
+- **Board**: Click agent health cards in the Board tab to see full run details.
+- **Protection**: Use Settings to configure file protection. Click “View all protected files” to see exactly what is covered.
 - **Vision**: Use the Camera icon in the dashboard to share your screen with the AI.
 
 ---
-*“Your machine, your command, anywhere.”* 🚀
+*”Your machine, your command, anywhere.”* 🚀

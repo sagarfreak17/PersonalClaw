@@ -1,4 +1,4 @@
-# PersonalClaw v12.0 🛸
+# PersonalClaw v12.2 🛸
 
 **The next-generation Windows AI agent. Local. Private. Unstoppable.**
 
@@ -10,32 +10,62 @@ PersonalClaw is a sophisticated, locally-hosted AI agent that combines Google Ge
 
 ---
 
-## ✨ v12.0 — Autonomous AI Company Orchestration (NEW)
+## ✨ v12.2 — Dashboard Overhaul & Workspace System (NEW)
 
-### 🏢 AI Organisations
+### 🗂️ Workspace Tab
+- **Files by agent role** — Workspace files organised by the agent that created them, with collapsible sections.
+- **Inline editor** — Click any file to view and edit it directly in the dashboard.
+- **Human comment system** — Leave feedback on any file. Comments are injected into the agent's next run prompt.
+- **Comments sidecar** — Stored as `{filename}.comments.json`, automatically hidden from file listings.
+
+### ✏️ Edit Agent — Reports To Dropdown
+- **Visual reporting line** — Edit Agent modal now includes a dropdown to set the agent's manager.
+- **Agent name + role** — Each option shows both name and role for clarity.
+
+### 🔔 Notification Fix
+- **No more `[undefined] undefined` toasts** — All notification emission points now have null guards.
+- **Proper field mapping** — Proposal and blocker notifications correctly populate orgName and agentName.
+
+### 📋 Proposals — Code Only
+- **Filtered view** — Proposals tab only shows code change proposals.
+- **Auto-approve** — Documents, plans, and hiring decisions are automatically approved (unless `requiresApproval: true`).
+
+### 📊 Board Tab Improvements
+- **Clickable health cards** — Expand to show full run summary, all file activity, and run history.
+- **Focused view** — Removed proposals section and workspace browser (both have dedicated tabs).
+
+### 🔒 Protection Visibility
+- **View all protected files** — Expandable section in Settings showing every protected file, grouped by directory.
+- **Git fix** — `snapshotGitFiles()` now runs from `org.rootDir` (not `workspaceDir`).
+
+---
+
+## 🏢 v12.0 — Autonomous AI Company Orchestration
+
+### AI Organisations
 - **Create up to 10 independent AI companies** with unique names, missions, and root directories.
 - **Org Isolation** — Each organisation operates in its own workspace with no cross-org data pollution.
-- **Persistence** — All org data, agent memories, and shared company state saved to `memory/orgs/`.
+- **Persistence** — All org data, agent memories, and shared company state saved to `orgs/`.
 
-### 👥 Professional Agent Personas
+### Professional Agent Personas
 - **Custom Roles** — Define any role (CEO, CTO, Lead Dev, Marketing, etc.).
 - **Rich Identity** — Every agent has a dedicated name, personality, responsibilities, and specific goals.
 - **Autonomous Memory** — Agents maintain persistent memory across runs, learning from their own past actions.
 - **Shared Memory** — A company-wide context board visible to all agents in the organisation.
 
-### 💓 Heartbeat & Trigger Engine
+### Heartbeat & Trigger Engine
 - **Cron Scheduling** — Set precise execution times for any agent (e.g., "Daily at 9 AM", "Every 15 minutes").
 - **Event-Driven Workflows** — Delegation automatically triggers heartbeats for target agents.
 - **Manual Control** — Trigger any agent run instantly from the dashboard or chat.
 - **Skip-if-Running** — Smart concurrency protection ensures heartbeats never stack or overlap.
 
-### 📋 Enterprise Ticket System
+### Enterprise Ticket System
 - **Kanban Task Board** — Manage work via Open → In Progress → Blocked → Done status.
 - **Agentic Delegation** — Agents can create, update, and assign tickets to each other or to you.
 - **Rich Context** — Each ticket includes descriptions, priority levels, comments, and full history trails.
 - **Write-Lock Protection** — Concurrent agent access is safe from data corruption.
 
-### 💬 Direct Agent Chat
+### Direct Agent Chat
 - **Instant Communication** — Click any agent to open a dedicated, persistent chat session.
 - **Separate Workspace** — Direct-chat panes are independent of the 3-pane human command center.
 - **Persistent Sessions** — The agent retains full context of your direct conversation between messages.
@@ -132,7 +162,7 @@ Open [http://localhost:5173](http://localhost:5173) (The batch file will launch 
 - **[SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — Installation & configuration
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Technical architecture and communication specs
 - **[DIR_STRUCTURE.md](docs/DIR_STRUCTURE.md)** — Entire project file mapping
-- **[version_log.md](docs/version_log.md)** — Complete version history (v1 → v12)
+- **[version_log.md](docs/version_log.md)** — Complete version history (v1 → v12.2)
 - **[AGENTS.md](AGENTS.md)** — Agent operating instructions and guidelines
 
 ---
@@ -152,8 +182,9 @@ Open [http://localhost:5173](http://localhost:5173) (The batch file will launch 
 |--------|-------|
 | **Core Skills** | 15 |
 | **Org-Mgmt Skills** | 1 |
-| **Org-Agent Skills** | 10 |
-| **Total Skills** | 26 |
+| **Org-Agent Skills** | 13 |
+| **Total Skills** | 29 |
+| **Dashboard Tabs** | 8 (Agents, Tickets, Board, Workspace, Proposals, Activity, Memory, Settings) |
 | **Max Orgs** | 10 |
 | **Max human panes** | 3 |
 | **Max workers/pane** | 5 |

@@ -177,7 +177,7 @@ Use this knowledge proactively. Adapt your tone, shortcuts, and workflow to matc
 
   return `# PersonalClaw v11.0 — Autonomous Windows Agent
 
-You are **PersonalClaw**, a locally-hosted autonomous AI agent with full system access on this Windows machine. You are not a chatbot — you are an **operator**. You have ${skills.length} tools, persistent memory, a triple-mode browser, and the ability to spawn sub-agents for parallel work.
+You are **PersonalClaw**, a locally-hosted autonomous AI agent with full system access on this Windows machine. You are not a chatbot — you are an **operator**. You have ${skills.length} tools, built-in **Google Search grounding**, persistent memory, a triple-mode browser, and the ability to spawn sub-agents for parallel work.
 
 **Current Time**: ${timestamp}
 
@@ -218,6 +218,7 @@ For simple questions or greetings, skip the framework — just respond naturally
 | Tool | What it does |
 |---|---|
 | \`browser\` | **Triple-mode browser**: Playwright (default isolated), Native Chrome (real logins via CDP/MCP), Extension Relay (real tabs via PersonalClaw extension). Check \`status\` first to see which modes are available. Scrape first (cheap) → click/type → screenshot only if visual layout matters. |
+| **Google Search** | **Built-in Grounding**. You have direct access to Google Search for factual queries, recent news, and real-time data. Use this for quick information retrieval without needing to launch the browser. |
 | \`http_request\` | REST API calls (GET/POST/PUT/DELETE) with headers, auth, and response handling. |
 
 ### Intelligence & Diagnostics
@@ -410,7 +411,25 @@ export class Brain {
       ...extraDefs,
       ...chromeNativeAdapter.getGeminiToolDefs(),
     ];
-    return genAI.getGenerativeModel({ model: modelId, tools: tools as any });
+
+    const isGemini3 = modelId.startsWith('gemini-3');
+    if (isGemini3) {
+      tools.push({ googleSearch: {} } as any);
+    }
+
+    const modelConfig: any = {
+      model: modelId,
+      tools: tools as any,
+    };
+
+    if (isGemini3) {
+      modelConfig.toolConfig = {
+        functionCallingConfig: { mode: 'AUTO' },
+        includeServerSideToolInvocations: true,
+      };
+    }
+
+    return genAI.getGenerativeModel(modelConfig);
   }
 
   /**

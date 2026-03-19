@@ -32,6 +32,7 @@ All notable changes to the PersonalClaw agent will be documented in this file.
 - Agent system prompt injection — unread comments on agent's files are included in the next run's system prompt, then marked as read
 - Path traversal protection — file read/write validates paths are within the workspace directory
 - 6 new socket events: `org:workspace:files:all`, `org:workspace:file:read`, `org:workspace:file:write`, `org:workspace:file:comment`, `org:workspace:file:comments:read`, `org:workspace:file:content`
+- Complete CSS overhaul for the `WorkspaceTab` component: Styled the file explorer, inline text editor, and comments section to match the dashboard's premium dark glassmorphism aesthetic.
 
 #### Board Tab Improvements
 - Agent health cards are now clickable — expand on click to show full run summary, all file activity with timestamps, and run history (last 10 runs)

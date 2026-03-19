@@ -64,7 +64,7 @@ type TabType = 'command' | 'metrics' | 'activity' | 'skills' | 'orgs';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Welcome back. PersonalClaw v11 is online and ready.', sender: 'bot', timestamp: new Date() }
+    { id: '1', text: 'Welcome back. PersonalClaw v12.2 is online and ready.', sender: 'bot', timestamp: new Date() }
   ]);
 
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -323,7 +323,7 @@ const App: React.FC = () => {
           <Sparkles size={22} style={{ color: 'var(--accent-primary)' }} />
           <h1>PersonalClaw</h1>
         </div>
-        <div className="version-badge">v11.0</div>
+        <div className="version-badge">v12.2</div>
 
         <nav style={{ flex: 1 }}>
           <ul style={{ listStyle: 'none' }}>

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AgentChatMessage } from '../types/org';
 
 interface AgentChatPaneProps {
@@ -11,7 +13,7 @@ interface AgentChatPaneProps {
   onClose: () => void;
 }
 
-export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaiting, onSend, onClose }: AgentChatPaneProps) {
+export function AgentChatPane({ agentName, agentRole, messages, isWaiting, onSend, onClose }: AgentChatPaneProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,13 @@ export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaitin
         </div>
         {messages.map(msg => (
           <div key={msg.id} className={`agent-chat-message ${msg.role}`}>
-            <div className="message-text">{msg.text}</div>
+            <div className="message-text">
+              {msg.role === 'assistant' ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              ) : (
+                msg.text
+              )}
+            </div>
             <div className="message-time">{new Date(msg.timestamp).toLocaleTimeString()}</div>
           </div>
         ))}

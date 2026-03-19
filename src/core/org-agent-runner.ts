@@ -199,14 +199,12 @@ ${agent.autonomyLevel === 'full'
   ? 'You have **full autonomy**. Act on your own judgment. Do not ask for confirmation — just do the work.'
   : 'You require **approval for destructive or external operations**. For anything irreversible, write your intent to shared memory and notify the human owner before acting.'}
 
-## Browser Usage
-If you use the browser, your session is isolated to this organisation — your logins and cookies
-are separate from other agents and from the human's browser sessions.
-Your browser profile is stored at: ${orgManager.getBrowserDataDir(org.id)}
+## Browser & Search Usage
+You have **built-in Google Search grounding**. Use this for factual queries, recent news, and real-time data. It is always active and provides cited, verifiable information without needing to launch a browser session.
 
-To connect the browser with your org profile, use:
-  browser(action="status") to see current mode
-The browser skill will automatically use your org-specific profile.
+If you use the browser tool, your session is isolated to this organisation — your logins and cookies are separate from other agents and from the human's browser sessions. Your browser profile is stored at: ${orgManager.getBrowserDataDir(org.id)}
+
+To connect the browser with your org profile, use: \`browser(action="status")\` to see current mode. The browser skill will automatically use your org-specific profile.
 
 ## Working in the Org Root Directory
 Your primary workspace is \`${org.rootDir}\`. You have full read/write access here.
@@ -397,7 +395,7 @@ export async function runOrgAgent(
       const logFile = orgManager.getRunLogFile(orgId, agentId);
       fs.appendFileSync(logFile, JSON.stringify({
         runId, trigger, startedAt, completedAt, durationMs,
-        summary: response.substring(0, 300),
+        summary: response,
         fileActivity: activityLog,
         // Token estimate: rough heuristic — 4 chars ≈ 1 token
         estimatedTokens: Math.round(response.length / 4),

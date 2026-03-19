@@ -63,6 +63,12 @@ export function useOrgs(socket: Socket) {
       setNotifications(prev => [notif, ...prev].slice(0, 50));
     };
 
+    const handleNotificationsList = (data: { orgId: string; notifications: OrgNotification[] }) => {
+      if (data.orgId === activeOrgId && data.notifications) {
+        setNotifications(data.notifications.slice(0, 50));
+      }
+    };
+
     const handleProposalsList = (d: any) => { if (d.orgId === activeOrgId) setProposals(d.proposals ?? []); };
     const handleProposalUpdate = (d: any) => { if (d.orgId === activeOrgId) socket.emit('org:proposals:list', { orgId: activeOrgId }); };
     const handleBlockersList = (d: any) => { if (d.orgId === activeOrgId) setBlockers(d.blockers ?? []); };
@@ -103,6 +109,7 @@ export function useOrgs(socket: Socket) {
     socket.on('org:tickets:list', handleTicketsList);
     socket.on('org:agent:run_update', handleRunUpdate);
     socket.on('org:notification', handleNotification);
+    socket.on('org:notifications:list', handleNotificationsList);
 
     return () => {
       socket.off('org:list', handleOrgList);
@@ -113,6 +120,7 @@ export function useOrgs(socket: Socket) {
       socket.off('org:tickets:list', handleTicketsList);
       socket.off('org:agent:run_update', handleRunUpdate);
       socket.off('org:notification', handleNotification);
+      socket.off('org:notifications:list', handleNotificationsList);
       socket.off('org:proposals:list', handleProposalsList);
       socket.off('org:proposal:update', handleProposalUpdate);
       socket.off('org:blockers:list', handleBlockersList);
@@ -130,6 +138,7 @@ export function useOrgs(socket: Socket) {
       socket.emit('org:proposals:list', { orgId: activeOrgId });
       socket.emit('org:blockers:list', { orgId: activeOrgId });
       socket.emit('org:activity', { orgId: activeOrgId, count: 100 });
+      socket.emit('org:notifications:list', { orgId: activeOrgId, count: 50 });
     }
   }, [activeOrgId, socket]);
 

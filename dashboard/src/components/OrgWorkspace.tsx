@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
+import { Bell, X } from 'lucide-react';
+
 import { useOrgs } from '../hooks/useOrgs';
 import { useOrgChat } from '../hooks/useOrgChat';
 import { AgentCard } from './AgentCard';
@@ -11,6 +13,7 @@ import { ProposalBoard } from './ProposalBoard';
 import { BoardOfDirectors } from './BoardOfDirectors';
 import { OrgProtectionSettings } from './OrgProtectionSettings';
 import { WorkspaceTab } from './WorkspaceTab';
+import { EditOrgModal } from './EditOrgModal';
 
 type OrgSubTab = 'agents' | 'tickets' | 'board' | 'workspace' | 'proposals' | 'activity' | 'memory' | 'settings';
 
@@ -33,11 +36,27 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
 
   const [subTab, setSubTab] = useState<OrgSubTab>('agents');
   const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [showEditOrg, setShowEditOrg] = useState(false);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [memoryContent, setMemoryContent] = useState<any>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const orgTickets = activeOrg ? (tickets[activeOrg.id] ?? []) : [];
+  const orgNotifications = activeOrg ? notifications.filter(n => n.orgId === activeOrg.id) : [];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications]);
+
 
   // FIX-O: use correlationId-based readMemory from useOrgChat
   const handleReadMemory = useCallback(async (agentId?: string) => {
@@ -100,11 +119,87 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
               <code className="org-rootdir">{activeOrg.rootDir}</code>
             </div>
             <div className="org-header-actions">
+              <div ref={notifRef} style={{ position: 'relative', display: 'inline-block', marginRight: '8px' }}>
+                <button 
+                  className="btn-sm" 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Bell size={16} /> Notifications
+                  {orgNotifications.length > 0 && (
+                    <span style={{ 
+                      background: 'var(--accent-primary)', 
+                      color: '#fff', 
+                      borderRadius: '12px', 
+                      padding: '2px 6px', 
+                      fontSize: '0.7rem', 
+                      fontWeight: 'bold',
+                      marginLeft: '4px'
+                    }}>
+                      {orgNotifications.length}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: 0, 
+                    top: '110%', 
+                    width: '350px', 
+                    maxHeight: '400px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: 'var(--bg-panel)', 
+                    border: '1px solid var(--border-color)', 
+                    borderRadius: '8px', 
+                    zIndex: 100, 
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)', 
+                    overflow: 'hidden' 
+                  }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-darker)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Notifications</h4>
+                      <button onClick={() => setShowNotifications(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0 }}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div style={{ overflowY: 'auto', flex: 1, padding: '8px' }}>
+                      {orgNotifications.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem', padding: '20px 0' }}>No notifications yet.</p>
+                      ) : (
+                        orgNotifications.map((notif, i) => (
+                          <div key={i} style={{ 
+                            padding: '10px', 
+                            borderBottom: '1px solid var(--border-color)', 
+                            fontSize: '0.85rem',
+                            background: notif.level === 'error' ? 'rgba(239, 68, 68, 0.1)' : notif.level === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+                            borderRadius: '4px',
+                            marginBottom: '4px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <strong style={{ color: 'var(--text)' }}>{notif.agentName}</strong>
+                              <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
+                                {new Date(notif.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>{notif.message}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 className={`btn-sm ${activeOrg.paused ? 'btn-success' : 'btn-warning'}`}
                 onClick={() => updateOrg(activeOrg.id, { paused: !activeOrg.paused })}
               >
                 {activeOrg.paused ? '▶ Resume Org' : '⏸ Pause Org'}
+              </button>
+              <button 
+                className="btn-sm" 
+                onClick={() => setShowEditOrg(true)}
+              >
+                ✏️ Edit Org
               </button>
               <button className="btn-sm btn-danger" onClick={() => {
                 if (confirm(`Delete ${activeOrg.name}? This cannot be undone.`)) deleteOrg(activeOrg.id);
@@ -235,6 +330,13 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
       )}
 
       {showCreateOrg && <CreateOrgModal onSubmit={createOrg} onClose={() => setShowCreateOrg(false)} />}
+      {showEditOrg && activeOrg && (
+        <EditOrgModal
+          org={activeOrg}
+          onSubmit={(updates) => updateOrg(activeOrg.id, updates)}
+          onClose={() => setShowEditOrg(false)}
+        />
+      )}
       {showCreateAgent && activeOrg && (
         <CreateAgentModal
           org={activeOrg}

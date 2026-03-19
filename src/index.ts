@@ -1,3 +1,7 @@
+// MUST be first — before any other imports so all console output is captured
+import { terminalLogger } from './core/terminal-logger.js';
+terminalLogger.start();
+
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -19,7 +23,10 @@ import { telegramBrain } from './core/telegram-brain.js';
 import { orgManager } from './core/org-manager.js';
 import { orgHeartbeat } from './core/org-heartbeat.js';
 import { orgTaskBoard } from './core/org-task-board.js';
-import { runOrgAgent, isAgentRunning, closeChatSession, getAllOrgConversationIds } from './core/org-agent-runner.js';
+import { runOrgAgent, isAgentRunning, closeChatSession, getAllOrgConversationIds, getRunningAgentsSet } from './core/org-agent-runner.js';
+import { approveProposal, rejectProposal, loadProposals, resetStaleInProgressTickets, getProposalContent } from './core/org-file-guard.js';
+import { storeNotification, getNotifications, setTelegramSender, sendDailyDigest } from './core/org-notification-store.js';
+import cron from 'node-cron';
 
 dotenv.config();
 
@@ -39,6 +46,12 @@ console.log('[Server] Initializing PersonalClaw v12...');
 
 console.log('[Server] Checking Telegram configuration...');
 const telegram = new TelegramInterface();
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  setTelegramSender(async (msg) => telegram.sendMessage(msg));
+}
+
+// FIX-AF: Reset stale in_progress tickets on startup
+setTimeout(() => resetStaleInProgressTickets(getRunningAgentsSet()), 2000);
 
 console.log('[Server] Attaching Extension Relay...');
 extensionRelay.attach(server);
@@ -61,11 +74,85 @@ initScheduler(async (msg) => {
 console.log('[Server] Starting Org Heartbeat Engine...');
 orgHeartbeat.startAll();
 
+// Load persisted activity feed into memory
+loadActivityFromDisk();
+
+cron.schedule('0 9 * * *', async () => {
+  for (const org of orgManager.list()) {
+    await sendDailyDigest(org.id).catch(e => console.error(`[Digest] ${org.id}:`, e));
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // ─── Activity Feed ──────────────────────────────────────────────────
 const activityBuffer: any[] = [];
 const MAX_ACTIVITY = 100;
+
+// NEW — persistence
+const ACTIVITY_FILE = path.join(process.cwd(), 'logs', 'activity.jsonl');
+const MAX_ACTIVITY_FILE_ENTRIES = 1000;
+
+let activityWriteCount = 0;
+
+/**
+ * Load the last 100 activity items from disk into the in-memory buffer.
+ * Called once on startup so the Activity tab isn't blank after a restart.
+ */
+function loadActivityFromDisk(): void {
+  try {
+    if (!fs.existsSync(ACTIVITY_FILE)) return;
+    const lines = fs.readFileSync(ACTIVITY_FILE, 'utf-8')
+      .split('\n')
+      .filter(Boolean)
+      .slice(-100); // only load last 100 into RAM
+    for (const line of lines) {
+      try { activityBuffer.push(JSON.parse(line)); } catch { /* skip corrupt lines */ }
+    }
+    console.log(`[Activity] Loaded ${activityBuffer.length} items from disk.`);
+  } catch (e) {
+    console.warn('[Activity] Failed to load from disk:', e);
+  }
+}
+
+/**
+ * Append one activity item to the in-memory buffer and persist to disk.
+ * Trims the file every 100 writes to stay under MAX_ACTIVITY_FILE_ENTRIES.
+ */
+function persistActivity(item: any): void {
+  // Existing in-memory logic
+  activityBuffer.push(item);
+  if (activityBuffer.length > MAX_ACTIVITY) activityBuffer.shift();
+
+  // Persist to disk
+  try {
+    const dir = path.dirname(ACTIVITY_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(ACTIVITY_FILE, JSON.stringify(item) + '\n');
+
+    // Trim file periodically — every 100 writes
+    if (++activityWriteCount % 100 === 0) {
+      trimActivityFile();
+    }
+  } catch (e) {
+    console.warn('[Activity] Failed to persist activity item:', e);
+  }
+}
+
+function trimActivityFile(): void {
+  try {
+    if (!fs.existsSync(ACTIVITY_FILE)) return;
+    const lines = fs.readFileSync(ACTIVITY_FILE, 'utf-8').split('\n').filter(Boolean);
+    if (lines.length > MAX_ACTIVITY_FILE_ENTRIES) {
+      const trimmed = lines.slice(-MAX_ACTIVITY_FILE_ENTRIES).join('\n') + '\n';
+      const tmp = ACTIVITY_FILE + '.tmp';
+      fs.writeFileSync(tmp, trimmed);
+      fs.renameSync(tmp, ACTIVITY_FILE);
+    }
+  } catch (e) {
+    console.warn('[Activity] Failed to trim activity file:', e);
+  }
+}
 
 eventBus.on('*', (event) => {
   if (event.type === Events.STREAMING_CHUNK) return;
@@ -78,10 +165,7 @@ eventBus.on('*', (event) => {
     summary: formatActivitySummary(event),
   };
 
-  activityBuffer.push(activityItem);
-  if (activityBuffer.length > MAX_ACTIVITY) {
-    activityBuffer.shift();
-  }
+  persistActivity(activityItem);
 
   io.emit('activity', activityItem);
 });
@@ -141,6 +225,9 @@ eventBus.on('brain:tool_called', (event: any) => {
       tool: data.name,
       timestamp: Date.now(),
     });
+
+    // 12.6 Live tool feed events
+    io.emit('chat:tool_feed', { conversationId: data.conversationId, type: 'started', tool: data.name, args: data.args, timestamp: Date.now() });
   }
 });
 
@@ -155,6 +242,9 @@ eventBus.on('brain:tool_completed', (event: any) => {
       success: data.success,
       timestamp: Date.now(),
     });
+
+    // 12.6 Live tool feed events
+    io.emit('chat:tool_feed', { conversationId: data.conversationId, type: 'completed', tool: data.name, durationMs: data.durationMs, success: data.success, timestamp: Date.now() });
   }
 });
 
@@ -202,6 +292,27 @@ eventBus.on(Events.ORG_TICKET_CREATED, (event: any) => {
 eventBus.on(Events.ORG_TICKET_UPDATED, (event: any) => {
   io.emit('org:ticket:update', { orgId: (event.data ?? event).ticket.orgId });
 });
+
+// Proposals
+eventBus.on('org:proposal:created', (event: any) => {
+  const data = event.data ?? event;
+  io.emit('org:proposal:update', { orgId: data.proposal.orgId });
+  io.emit('org:notification', { ...data.proposal, message: `Proposed change to \`${data.proposal.relativePath}\``, level: 'warning', type: 'proposal', timestamp: Date.now() });
+});
+eventBus.on('org:proposal:approved', (event: any) => io.emit('org:proposal:update', { orgId: (event.data ?? event).proposal.orgId }));
+eventBus.on('org:proposal:rejected', (event: any) => io.emit('org:proposal:update', { orgId: (event.data ?? event).proposal.orgId }));
+
+// Blockers
+eventBus.on('org:blocker:created', (event: any) => {
+  const data = event.data ?? event;
+  io.emit('org:blocker:update', { orgId: data.blocker.orgId });
+  io.emit('org:notification', { orgId: data.blocker.orgId, orgName: orgManager.get(data.blocker.orgId)?.name, agentName: data.blocker.agentLabel, message: `🚧 ${data.blocker.title}`, level: 'error', type: 'blocker', timestamp: Date.now() });
+  storeNotification({ orgId: data.blocker.orgId, orgName: orgManager.get(data.blocker.orgId)?.name ?? '', agentName: data.blocker.agentLabel, message: `🚧 ${data.blocker.title}: ${data.blocker.humanActionRequired}`, level: 'error', type: 'blocker', timestamp: Date.now() });
+});
+eventBus.on('org:blocker:update', (event: any) => io.emit('org:blocker:update', { orgId: (event.data ?? event).orgId }));
+
+// File activity (live)
+eventBus.on('org:agent:file_activity', (event: any) => io.emit('org:agent:file_activity', event.data ?? event));
 
 // ─── System Metrics Broadcaster ─────────────────────────────────────
 let cachedMetrics = { cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' };
@@ -485,6 +596,106 @@ io.on('connection', (socket) => {
     console.log(`[Server] Dashboard disconnected: ${socket.id}`);
     eventBus.dispatch(Events.DASHBOARD_DISCONNECTED, { socketId: socket.id }, 'server');
   });
+
+  // Proposals
+  socket.on('org:proposals:list', (params: { orgId: string }) => {
+    socket.emit('org:proposals:list', { orgId: params.orgId, proposals: loadProposals(params.orgId) });
+  });
+  socket.on('org:proposal:content', (params: { orgId: string; proposalId: string }) => {
+    const content = getProposalContent(params.orgId, params.proposalId);
+    socket.emit('org:proposal:content', { proposalId: params.proposalId, ...content });
+  });
+  socket.on('org:proposal:approve', (params: { orgId: string; proposalId: string }) => {
+    const result = approveProposal(params.orgId, params.proposalId);
+    if (result.success) io.emit('org:proposal:update', { orgId: params.orgId });
+    socket.emit('org:proposal:result', result);
+  });
+  socket.on('org:proposal:reject', (params: { orgId: string; proposalId: string }) => {
+    const result = rejectProposal(params.orgId, params.proposalId);
+    if (result.success) io.emit('org:proposal:update', { orgId: params.orgId });
+    socket.emit('org:proposal:result', result);
+  });
+
+  // Protection management
+  socket.on('org:protection:update', (params: {
+    orgId: string;
+    mode?: string;
+    manualPaths?: string[];
+    refreshGit?: boolean;
+  }) => {
+    try {
+      const org = orgManager.updateProtection(params.orgId, {
+        mode: params.mode as any,
+        manualPaths: params.manualPaths,
+        refreshGit: params.refreshGit,
+      });
+      io.emit('org:updated', org);
+    } catch (err: any) {
+      socket.emit('org:error', { message: err.message });
+    }
+  });
+
+  // Blockers
+  socket.on('org:blockers:list', (params: { orgId: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:blockers:list', { orgId: params.orgId, blockers: [] });
+      const file = path.join(org.orgDir, 'blockers.json');
+      const blockers = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : [];
+      socket.emit('org:blockers:list', { orgId: params.orgId, blockers });
+    } catch { socket.emit('org:blockers:list', { orgId: params.orgId, blockers: [] }); }
+  });
+  socket.on('org:blocker:resolve', (params: { orgId: string; blockerId: string; resolution: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return;
+      const file = path.join(org.orgDir, 'blockers.json');
+      const blockers = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : [];
+      const idx = blockers.findIndex((b: any) => b.id === params.blockerId);
+      if (idx > -1) {
+        blockers[idx] = { ...blockers[idx], status: 'resolved', resolvedAt: new Date().toISOString(), resolution: params.resolution };
+        const tmp = file + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(blockers, null, 2));
+        fs.renameSync(tmp, file);
+        io.emit('org:blocker:update', { orgId: params.orgId });
+      }
+    } catch (e: any) { socket.emit('org:error', { message: e.message }); }
+  });
+  
+  // Stored notifications
+  socket.on('org:notifications:list', (params: { orgId: string; count?: number }) => {
+    socket.emit('org:notifications:list', { orgId: params.orgId, notifications: getNotifications(params.orgId, params.count ?? 100) });
+  });
+  
+  // Agent run activity
+  socket.on('org:agent:activity', (params: { orgId: string; agentId: string }) => {
+    try {
+      const logFile = orgManager.getRunLogFile(params.orgId, params.agentId);
+      if (!fs.existsSync(logFile)) return socket.emit('org:agent:activity', { runs: [] });
+      const runs = fs.readFileSync(logFile, 'utf-8').split('\n').filter(Boolean).slice(-20)
+        .map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      socket.emit('org:agent:activity', { orgId: params.orgId, agentId: params.agentId, runs });
+    } catch { socket.emit('org:agent:activity', { runs: [] }); }
+  });
+  
+  // Workspace file browser
+  socket.on('org:workspace:list', (params: { orgId: string; subdir?: string }) => {
+    try {
+      const org = orgManager.get(params.orgId);
+      if (!org) return socket.emit('org:workspace:list', { files: [] });
+      const dir = params.subdir ? path.join(org.workspaceDir, params.subdir) : org.workspaceDir;
+      if (!fs.existsSync(dir)) return socket.emit('org:workspace:list', { files: [] });
+      const entries = fs.readdirSync(dir, { withFileTypes: true }).map(e => ({
+        name: e.name,
+        isDir: e.isDirectory(),
+        path: path.join(params.subdir ?? '', e.name).replace(/\\/g, '/'),
+        size: e.isFile() ? fs.statSync(path.join(dir, e.name)).size : 0,
+        modified: e.isFile() ? fs.statSync(path.join(dir, e.name)).mtime.toISOString() : null,
+      }));
+      socket.emit('org:workspace:list', { orgId: params.orgId, dir: params.subdir ?? '/', files: entries });
+    } catch (e: any) { socket.emit('org:error', { message: e.message }); }
+  });
+
 });
 
 // ─── REST API ───────────────────────────────────────────────────────
@@ -639,6 +850,51 @@ app.post('/api/orgs/:id/tickets', async (req, res) => {
     res.json(ticket);
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });
+// Protection management
+app.post('/api/check-git', (req, res) => {
+  const { dir } = req.body;
+  if (!dir) return res.status(400).json({ error: 'dir required' });
+  const { hasGitRepo, snapshotGitFiles } = require('./core/org-file-guard.js');
+  const available = hasGitRepo(dir);
+  const count = available ? snapshotGitFiles(dir).length : 0;
+  res.json({ available, fileCount: count });
+});
+
+app.put('/api/orgs/:id/protection', (req, res) => {
+  try {
+    const { mode, manualPaths, refreshGit } = req.body;
+    const org = orgManager.updateProtection(req.params.id, { mode, manualPaths, refreshGit });
+    io.emit('org:updated', org);
+    res.json(org);
+  } catch (err: any) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/browse-folder', async (req, res) => {
+  try {
+    const { execSync } = await import('child_process');
+    const result = execSync(
+      `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select folder to protect'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.SelectedPath } else { '' }"`,
+      { encoding: 'utf-8', timeout: 30000 }
+    ).trim();
+    res.json({ path: result || null });
+  } catch {
+    res.json({ path: null });
+  }
+});
+
+app.post('/api/browse-file', async (req, res) => {
+  try {
+    const { execSync } = await import('child_process');
+    const result = execSync(
+      `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Multiselect = $false; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.FileName } else { '' }"`,
+      { encoding: 'utf-8', timeout: 30000 }
+    ).trim();
+    res.json({ path: result || null });
+  } catch {
+    res.json({ path: null });
+  }
+});
+
 app.put('/api/orgs/:orgId/tickets/:ticketId', async (req, res) => {
   try {
     const ticket = await orgTaskBoard.update(req.params.orgId, req.params.ticketId, {
@@ -679,12 +935,14 @@ const shutdown = async (signal: string) => {
   // Close HTTP server
   server.close(() => {
     console.log('[Server] HTTP server closed.');
+    terminalLogger.stop(); // flush and close log file
     process.exit(0);
   });
 
   // Force exit after 5 seconds
   setTimeout(() => {
     console.error('[Server] Forced shutdown after timeout.');
+    terminalLogger.stop();
     process.exit(1);
   }, 5000);
 };

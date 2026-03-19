@@ -1,7 +1,18 @@
 import cron from 'node-cron';
 import { orgManager } from './org-manager.js';
-import { runOrgAgent, isAgentRunning } from './org-agent-runner.js';
+import { runOrgAgent, isAgentRunning, getRunningCount } from './org-agent-runner.js';
 import { eventBus, Events } from './events.js';
+
+function staggerCron(expression: string, offsetMinutes: number): string {
+  const parts = expression.split(' ');
+  if (parts.length !== 5) return expression;
+  const minutePart = parts[0];
+  if (minutePart.includes('/') || minutePart.includes(',')) return expression; // FIX-U
+  const minute = minutePart === '*' ? 0 : parseInt(minutePart, 10);
+  if (isNaN(minute)) return expression;
+  parts[0] = String((minute + offsetMinutes) % 60);
+  return parts.join(' ');
+}
 
 class OrgHeartbeatEngine {
   private tasks: Map<string, cron.ScheduledTask> = new Map();
@@ -33,9 +44,10 @@ class OrgHeartbeatEngine {
   startAll(): void {
     const orgs = orgManager.list();
     let count = 0;
+    const cronOffsets = new Map<string, number>();
     for (const org of orgs) {
       for (const agent of org.agents) {
-        if (this.scheduleAgent(org.id, agent.id)) count++;
+        if (this.scheduleAgent(org.id, agent.id, cronOffsets)) count++;
       }
     }
     console.log(`[OrgHeartbeat] Scheduled ${count} agent heartbeats across ${orgs.length} organisations.`);
@@ -67,25 +79,34 @@ class OrgHeartbeatEngine {
   }
 
   // FIX-N: public so orgManagementSkill can call it directly without bracket notation
-  public scheduleAgent(orgId: string, agentId: string): boolean {
+  public scheduleAgent(orgId: string, agentId: string, cronOffsets?: Map<string, number>): boolean {
     const org = orgManager.get(orgId);
     const agent = org?.agents.find(a => a.id === agentId);
     if (!agent || !agent.heartbeat.enabled || !agent.heartbeat.cron) return false;
-    if (!cron.validate(agent.heartbeat.cron)) {
-      console.warn(`[OrgHeartbeat] Invalid cron for agent ${agentId}: ${agent.heartbeat.cron}`);
+
+    let cronExpr = agent.heartbeat.cron;
+    if (cronOffsets) {
+      const existing = cronOffsets.get(cronExpr) ?? 0;
+      if (existing > 0) cronExpr = staggerCron(cronExpr, existing * 2);
+      cronOffsets.set(agent.heartbeat.cron, existing + 1);
+    }
+
+    if (!cron.validate(cronExpr)) {
+      console.warn(`[OrgHeartbeat] Invalid cron for agent ${agentId}: ${cronExpr}`);
       return false;
     }
 
     const key = `${orgId}:${agentId}`;
     this.tasks.get(key)?.stop();
 
-    const task = cron.schedule(agent.heartbeat.cron, async () => {
-      console.log(`[OrgHeartbeat] ⏰ Heartbeat: ${agent.name} (${agent.role}) in ${org?.name}`);
+    const task = cron.schedule(cronExpr, async () => {
+      console.log(`[OrgHeartbeat] ⏰ Heartbeat: ${agent?.name} (${agent?.role}) in ${org?.name}`);
+      // FIX-V: queue handled inside runOrgAgent — just fire and let it queue
       eventBus.dispatch(Events.ORG_AGENT_HEARTBEAT_FIRED, {
         orgId, agentId, trigger: 'cron', agentName: agent.name,
       }, 'org-heartbeat');
       runOrgAgent(orgId, agentId, 'cron').catch(err => {
-        console.error(`[OrgHeartbeat] Cron run failed for ${agentId}:`, err.message);
+        console.error(`[OrgHeartbeat] Run failed for ${agentId}:`, err.message);
       });
     });
 

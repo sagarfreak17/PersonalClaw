@@ -7,8 +7,11 @@ import { TicketBoard } from './TicketBoard';
 import { AgentChatPane } from './AgentChatPane';
 import { CreateOrgModal } from './CreateOrgModal';
 import { CreateAgentModal } from './CreateAgentModal';
+import { ProposalBoard } from './ProposalBoard';
+import { BoardOfDirectors } from './BoardOfDirectors';
+import { OrgProtectionSettings } from './OrgProtectionSettings';
 
-type OrgSubTab = 'agents' | 'tickets' | 'activity' | 'memory';
+type OrgSubTab = 'agents' | 'tickets' | 'board' | 'proposals' | 'activity' | 'memory' | 'settings';
 
 interface OrgWorkspaceProps {
   socket: Socket;
@@ -109,16 +112,19 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
           </div>
 
           <div className="org-subtabs">
-            {(['agents', 'tickets', 'activity', 'memory'] as OrgSubTab[]).map(tab => (
+            {(['agents', 'tickets', 'board', 'proposals', 'activity', 'memory', 'settings'] as OrgSubTab[]).map(tab => (
               <button
                 key={tab}
                 className={`org-subtab ${subTab === tab ? 'active' : ''}`}
                 onClick={() => setSubTab(tab)}
               >
-                {tab === 'agents' ? `👥 Agents (${activeOrg.agents.length})`
-                  : tab === 'tickets' ? `🎫 Tickets (${orgTickets.filter(t => t.status !== 'done').length})`
-                  : tab === 'activity' ? '📋 Activity'
-                  : '🧠 Memory'}
+                {tab === 'agents' ? `Agents (${activeOrg.agents.length})`
+                  : tab === 'tickets' ? `Tickets (${orgTickets.filter(t => t.status !== 'done').length})`
+                  : tab === 'board' ? 'Board'
+                  : tab === 'proposals' ? 'Proposals'
+                  : tab === 'activity' ? 'Activity'
+                  : tab === 'settings' ? 'Settings'
+                  : 'Memory'}
               </button>
             ))}
           </div>
@@ -151,6 +157,14 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
                 onCreateTicket={(ticket) => createTicket(activeOrg.id, ticket)}
                 onUpdateTicket={(ticketId, updates) => updateTicket(activeOrg.id, ticketId, updates)}
               />
+            )}
+
+            {subTab === 'board' && (
+              <BoardOfDirectors orgId={activeOrg.id} orgName={activeOrg.name} agents={activeOrg.agents} socket={socket} />
+            )}
+
+            {subTab === 'proposals' && (
+              <ProposalBoard orgId={activeOrg.id} socket={socket} />
             )}
 
             {subTab === 'activity' && (
@@ -192,6 +206,10 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
                   }
                 </div>
               </div>
+            )}
+
+            {subTab === 'settings' && (
+              <OrgProtectionSettings org={activeOrg} socket={socket} />
             )}
           </div>
         </div>

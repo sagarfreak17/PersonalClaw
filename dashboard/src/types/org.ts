@@ -1,4 +1,13 @@
 export type AutonomyLevel = 'full' | 'approval_required';
+export type ProtectionMode = 'none' | 'git' | 'manual' | 'both';
+
+export interface OrgProtection {
+  mode: ProtectionMode;
+  gitFiles: string[];
+  manualPaths: string[];
+  lastUpdated: string;
+}
+
 export type TicketStatus = 'open' | 'in_progress' | 'blocked' | 'done';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -32,6 +41,7 @@ export interface Org {
   createdAt: string;
   paused: boolean;
   agents: OrgAgent[];
+  protection: OrgProtection;
 }
 
 export interface TicketComment {
@@ -80,5 +90,77 @@ export interface OrgNotification {
   agentName: string;
   message: string;
   level: 'info' | 'success' | 'warning' | 'error';
+  timestamp: number;
+}
+
+export interface CodeProposal {
+  id: string;
+  orgId: string;
+  agentId: string;
+  agentLabel: string;
+  relativePath: string;
+  explanation: string;
+  status: 'pending' | 'approved' | 'rejected';
+  isStale: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export interface ProposalContent {
+  original: string;
+  proposed: string;
+}
+
+export interface Blocker {
+  id: string;
+  orgId: string;
+  agentId: string;
+  agentLabel: string;
+  title: string;
+  description: string;
+  workaroundAttempted: string;
+  humanActionRequired: string;
+  ticketId: string | null;
+  status: 'open' | 'resolved';
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution?: string;
+}
+
+export interface AgentRunLog {
+  runId: string;
+  trigger: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  summary: string;
+  fileActivity?: FileActivityEntry[];
+  estimatedTokens?: number;
+}
+
+export interface FileActivityEntry {
+  action: 'write' | 'delete' | 'create';
+  path: string;
+  agentId: string;
+  agentLabel?: string;
+  timestamp: string;
+}
+
+export interface WorkspaceFile {
+  name: string;
+  isDir: boolean;
+  path: string;
+  size: number;
+  modified: string | null;
+}
+
+export interface ToolFeedItem {
+  conversationId: string;
+  type: 'started' | 'completed';
+  tool: string;
+  args?: any;
+  durationMs?: number;
+  success?: boolean;
   timestamp: number;
 }

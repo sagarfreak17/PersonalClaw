@@ -5,15 +5,62 @@ import { orgTaskBoard } from './org-task-board.js';
 import { orgSkills } from '../skills/org-skills.js';
 import { eventBus, Events } from './events.js';
 import { getToolDefinitions } from '../skills/index.js';
+import { isProtectedFile } from './org-file-guard.js';
 
-const ORGS_DIR = path.join(process.cwd(), 'memory', 'orgs');
+const ORGS_DIR = path.join(process.cwd(), 'orgs');
 
-// Track currently running agents (heartbeat runs) — skip-if-running logic
 const runningAgents: Set<string> = new Set();
+const runningCounts: Map<string, number> = new Map();
+const MAX_CONCURRENT_PER_ORG = 5;
+const orgQueues: Map<string, Array<() => void>> = new Map();
 
-// FIX-I: Persistent Brain instances per direct chat session
-// Key: chatId, Value: Brain instance
+export function getRunningCount(orgId: string): number {
+  return runningCounts.get(orgId) ?? 0;
+}
+
+function incrementRunning(orgId: string) {
+  runningCounts.set(orgId, (runningCounts.get(orgId) ?? 0) + 1);
+}
+
+function decrementRunning(orgId: string) {
+  const count = Math.max(0, (runningCounts.get(orgId) ?? 1) - 1);
+  runningCounts.set(orgId, count);
+  const queue = orgQueues.get(orgId);
+  if (queue?.length && count < MAX_CONCURRENT_PER_ORG) queue.shift()!();
+}
+
+function waitForSlot(orgId: string): Promise<void> {
+  if (getRunningCount(orgId) < MAX_CONCURRENT_PER_ORG) return Promise.resolve();
+  return new Promise(resolve => {
+    if (!orgQueues.has(orgId)) orgQueues.set(orgId, []);
+    orgQueues.get(orgId)!.push(resolve);
+  });
+}
+
 const chatBrains: Map<string, any> = new Map();
+const chatBrainLastActivity: Map<string, number> = new Map();
+const CHAT_BRAIN_IDLE_MS = 30 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [chatId, lastActivity] of chatBrainLastActivity.entries()) {
+    if (now - lastActivity > CHAT_BRAIN_IDLE_MS) {
+      chatBrains.delete(chatId);
+      chatBrainLastActivity.delete(chatId);
+      console.log(`[OrgAgentRunner] Idle chat Brain cleaned: ${chatId}`);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Per-run notification counter — reset each run
+export const runNotifyCounters: Map<string, number> = new Map(); // key: runId
+export const activeRunIds: Map<string, string> = new Map(); // key: agentId -> runId
+
+export function incrementNotifyCounter(runId: string): boolean {
+  const count = (runNotifyCounters.get(runId) ?? 0) + 1;
+  runNotifyCounters.set(runId, count);
+  return count <= 5; // return false when over limit
+}
 
 // ─── System Prompt Builder ────────────────────────────────────────
 
@@ -114,6 +161,15 @@ ${agent.autonomyLevel === 'full'
   ? 'You have **full autonomy**. Act on your own judgment. Do not ask for confirmation — just do the work.'
   : 'You require **approval for destructive or external operations**. For anything irreversible, write your intent to shared memory and notify the human owner before acting.'}
 
+## Browser Usage
+If you use the browser, your session is isolated to this organisation — your logins and cookies
+are separate from other agents and from the human's browser sessions.
+Your browser profile is stored at: ${orgManager.getBrowserDataDir(org.id)}
+
+To connect the browser with your org profile, use:
+  browser(action="status") to see current mode
+The browser skill will automatically use your org-specific profile.
+
 ## Working in the Org Root Directory
 Your primary workspace is \`${org.rootDir}\`. You have full read/write access here.
 
@@ -121,13 +177,74 @@ Your primary workspace is \`${org.rootDir}\`. You have full read/write access he
 - Never impersonate other agents or write on their behalf.
 - Never modify another agent's private memory file.
 - Never delete files from the org root without explicit human instruction.
+- You do NOT have access to \`execute_powershell\` or \`run_python_script\` — these tools are
+  disabled for org agents to protect the codebase. Use \`org_propose_code_change\` for code
+  changes and \`manage_files\` for reading project files.
 - Call \`org_write_agent_memory\` at the end of EVERY run — even if you did nothing.
 - Keep your reports concise and actionable.`;
 }
 
-// ─── Brain Factory ────────────────────────────────────────────────
+// ─── Brain Factory & Interceptors ─────────────────────────────────
 
-async function createOrgAgentBrain(org: Org, agent: OrgAgent): Promise<any> {
+export interface FileActivityEntry {
+  action: 'write' | 'delete' | 'create';
+  path: string;
+  agentId: string;
+  agentLabel: string;
+  timestamp: string;
+}
+
+async function orgAwareHandleToolCall(
+  name: string, args: any, meta: any,
+  org: Org, agent: OrgAgent, activityLog: FileActivityEntry[]
+): Promise<any> {
+  const { handleToolCall } = await import('../skills/index.js');
+  const WRITE_SKILLS = new Set(['manage_files', 'manage_pdf']);
+  const WRITE_ACTIONS = new Set(['write', 'append', 'create', 'merge', 'split', 'rotate', 'watermark', 'extract_pages']);
+
+  if (WRITE_SKILLS.has(name) && WRITE_ACTIONS.has(args.action)) {
+    const targetPath = path.resolve(args.path ?? args.output_path ?? '');
+    const protectedFiles = orgManager.getProtectedFiles(org.id);
+    if (org.protection.mode !== 'none' && isProtectedFile(targetPath, protectedFiles)) {
+      return {
+        intercepted: true,
+        success: false,
+        message: `This is a protected file. Use \`org_propose_code_change\` to submit a proposal. Continue with other tasks.`,
+      };
+    }
+    // Not protected — log write activity
+    activityLog.push({
+      action: args.action === 'create' ? 'create' : 'write',
+      path: targetPath,
+      agentId: agent.id,
+      agentLabel: `${agent.name} (${agent.role})`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+  return handleToolCall(name, args, meta);
+}
+
+const MEMORY_BLOAT_THRESHOLD = 50 * 1024;
+
+async function checkAndSummariseMemory(orgId: string, agentId: string): Promise<void> {
+  const memFile = orgManager.getAgentMemoryFile(orgId, agentId);
+  if (!fs.existsSync(memFile) || fs.statSync(memFile).size < MEMORY_BLOAT_THRESHOLD) return;
+  console.log(`[OrgAgentRunner] Memory for ${agentId} > 50KB. Summarising...`);
+  try {
+    const { Brain } = await import('./brain.js');
+    const current = JSON.parse(fs.readFileSync(memFile, 'utf-8'));
+    const summaryBrain = new Brain({ agentId: `summariser_${agentId}`, conversationId: `summarise_${Date.now()}`, isWorker: true });
+    const summary = await summaryBrain.processMessage(
+      `Summarise this agent memory into concise JSON with same structure, keeping only the most important recent notes, top 3 priorities, top 3 pending actions. Return only valid JSON.\n\n${JSON.stringify(current, null, 2)}`
+    );
+    const summarised = JSON.parse(summary.replace(/```json|```/g, '').trim());
+    const tmp = memFile + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ ...summarised, lastSummarisedAt: new Date().toISOString() }, null, 2));
+    fs.renameSync(tmp, memFile);
+  } catch (e) { console.warn(`[OrgAgentRunner] Memory summarisation failed for ${agentId}:`, e); }
+}
+
+async function createOrgAgentBrain(org: Org, agent: OrgAgent, activityLog: FileActivityEntry[]): Promise<any> {
   // FIX-A: Lazy dynamic import breaks circular dependency
   const { Brain } = await import('./brain.js');
 
@@ -140,18 +257,19 @@ async function createOrgAgentBrain(org: Org, agent: OrgAgent): Promise<any> {
     conversationLabel: `${agent.name} (${agent.role})`,
     isWorker: false,
     systemPromptOverride,
-    historyDir,   // FIX-H: writes session files to agent dir, not global memory/
+    historyDir,
     orgId: org.id,
     orgAgentId: agent.id,
+    toolCallInterceptor: (name: string, args: any, meta: any) =>
+      orgAwareHandleToolCall(name, args, meta, org, agent, activityLog),
   });
 
-  // FIX-K: filter manage_scheduler from org agent tool list
-  // Scheduled jobs created by org agents would fire into Chat 1 — not the org system.
-  // Org agents should use org_write_report + org_notify for recurring summaries instead.
-  // This is enforced by filtering the tool out of the Gemini tool definitions.
-  // We patch this after Brain construction by calling brain.filterTools().
-  // Add filterTools() to Brain class (see Step 1 addendum below).
-  brain.filterTools((name: string) => name !== 'manage_scheduler');
+  // FIX-Y: filter powershell + python. FIX-K: filter manage_scheduler.
+  brain.filterTools((name: string) =>
+    name !== 'manage_scheduler' &&
+    name !== 'execute_powershell' &&
+    name !== 'run_python_script'
+  );
 
   // Inject org-specific skills
   brain.injectExtraTools(orgSkills);
@@ -175,98 +293,92 @@ export interface OrgAgentRunResult {
 }
 
 export async function runOrgAgent(
-  orgId: string,
-  agentId: string,
+  orgId: string, agentId: string,
   trigger: 'cron' | 'event' | 'manual' | 'chat',
-  messageOverride?: string,
-  chatId?: string   // FIX-I: required when trigger === 'chat' for session persistence
+  messageOverride?: string, chatId?: string
 ): Promise<OrgAgentRunResult> {
   const runKey = `${orgId}:${agentId}`;
   const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
   const startedAt = new Date().toISOString();
 
-  // Skip-if-running only applies to non-chat triggers
   if (trigger !== 'chat' && runningAgents.has(runKey)) {
     orgManager.recordRun(orgId, agentId, 'skipped');
     eventBus.dispatch(Events.ORG_AGENT_HEARTBEAT_SKIPPED, { orgId, agentId, trigger }, 'org-agent-runner');
-    return {
-      runId, agentId, orgId, trigger, startedAt, completedAt: startedAt,
-      durationMs: 0, response: '', skipped: true,
-      skipReason: 'Agent is still running from previous heartbeat.',
-    };
+    return { runId, agentId, orgId, trigger, startedAt, completedAt: startedAt, durationMs: 0, response: '', skipped: true, skipReason: 'Still running from previous heartbeat.' };
   }
 
   const org = orgManager.get(orgId);
   if (!org) throw new Error(`Org ${orgId} not found`);
   const agent = org.agents.find(a => a.id === agentId);
-  if (!agent) throw new Error(`Agent ${agentId} not found in org ${orgId}`);
-
-  // Respect paused state (for all trigger types including chat)
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (agent.paused || org.paused) {
-    return {
-      runId, agentId, orgId, trigger, startedAt, completedAt: startedAt,
-      durationMs: 0, response: '', skipped: true,
-      skipReason: agent.paused ? 'Agent is paused.' : 'Org is paused.',
-    };
+    return { runId, agentId, orgId, trigger, startedAt, completedAt: startedAt, durationMs: 0, response: '', skipped: true, skipReason: agent.paused ? 'Agent paused.' : 'Org paused.' };
   }
 
-  if (trigger !== 'chat') runningAgents.add(runKey);
-  const startMs = Date.now();
+  if (trigger !== 'chat') {
+    await waitForSlot(orgId);
+    runningAgents.add(runKey);
+    incrementRunning(orgId);
+  }
 
-  eventBus.dispatch(Events.ORG_AGENT_RUN_STARTED, {
-    runId, agentId, orgId, agentName: agent.name, role: agent.role, trigger,
-  }, 'org-agent-runner');
+  activeRunIds.set(agentId, runId);
+  const startMs = Date.now();
+  const activityLog: FileActivityEntry[] = [];
+  await checkAndSummariseMemory(orgId, agentId);
+
+  eventBus.dispatch(Events.ORG_AGENT_RUN_STARTED, { runId, agentId, orgId, agentName: agent.name, role: agent.role, trigger }, 'org-agent-runner');
 
   try {
     let brain: any;
-
     if (trigger === 'chat' && chatId) {
-      // FIX-I: Reuse existing Brain for this chat session so the agent
-      // remembers the full conversation context across multiple messages
       if (!chatBrains.has(chatId)) {
-        brain = await createOrgAgentBrain(org, agent);
+        brain = await createOrgAgentBrain(org, agent, activityLog);
         chatBrains.set(chatId, brain);
       } else {
         brain = chatBrains.get(chatId);
-        // Refresh the system prompt so agent sees latest memory/tickets
-        // but preserve conversation history for continuity
         brain.updateSystemPromptOverride(buildOrgAgentSystemPrompt(org, agent));
       }
+      chatBrainLastActivity.set(chatId, Date.now());
     } else {
-      // Heartbeat runs: always fresh Brain with latest state
-      brain = await createOrgAgentBrain(org, agent);
+      brain = await createOrgAgentBrain(org, agent, activityLog);
     }
 
-    const prompt = messageOverride ?? `[HEARTBEAT:${trigger.toUpperCase()}] You have been activated. Begin your run now. Follow your instructions. Work autonomously.`;
+    const prompt = messageOverride ?? `[HEARTBEAT:${trigger.toUpperCase()}] You have been activated. Begin your run now.`;
     const response = await brain.processMessage(prompt);
     const durationMs = Date.now() - startMs;
     const completedAt = new Date().toISOString();
 
-    // Append to run log (only for non-chat triggers)
     if (trigger !== 'chat') {
       const logFile = orgManager.getRunLogFile(orgId, agentId);
       fs.appendFileSync(logFile, JSON.stringify({
         runId, trigger, startedAt, completedAt, durationMs,
         summary: response.substring(0, 300),
+        fileActivity: activityLog,
+        // Token estimate: rough heuristic — 4 chars ≈ 1 token
+        estimatedTokens: Math.round(response.length / 4),
       }) + '\n');
       orgManager.recordRun(orgId, agentId, 'completed');
     }
 
-    eventBus.dispatch(Events.ORG_AGENT_RUN_COMPLETED, {
-      runId, agentId, orgId, agentName: agent.name, role: agent.role, durationMs, trigger,
-    }, 'org-agent-runner');
+    if (activityLog.length > 0) {
+      eventBus.dispatch('org:agent:file_activity', { orgId, agentId, agentName: agent.name, role: agent.role, runId, activity: activityLog }, 'org-agent-runner');
+    }
 
+    eventBus.dispatch(Events.ORG_AGENT_RUN_COMPLETED, { runId, agentId, orgId, agentName: agent.name, role: agent.role, durationMs, trigger }, 'org-agent-runner');
     return { runId, agentId, orgId, trigger, startedAt, completedAt, durationMs, response, skipped: false };
 
   } catch (err: any) {
     const durationMs = Date.now() - startMs;
     if (trigger !== 'chat') orgManager.recordRun(orgId, agentId, 'failed');
-    eventBus.dispatch(Events.ORG_AGENT_RUN_FAILED, {
-      runId, agentId, orgId, error: err.message, trigger,
-    }, 'org-agent-runner');
+    eventBus.dispatch(Events.ORG_AGENT_RUN_FAILED, { runId, agentId, orgId, error: err.message, trigger }, 'org-agent-runner');
     throw err;
   } finally {
-    if (trigger !== 'chat') runningAgents.delete(runKey);
+    if (trigger !== 'chat') {
+      runningAgents.delete(runKey);
+      decrementRunning(orgId);
+    }
+    runNotifyCounters.delete(runId);
+    activeRunIds.delete(agentId);
   }
 }
 
@@ -280,13 +392,14 @@ export function isAgentRunning(orgId: string, agentId: string): boolean {
   return runningAgents.has(`${orgId}:${agentId}`);
 }
 
-// FIX-M: Get all org agent conversation IDs for shutdown cleanup
 export function getAllOrgConversationIds(): string[] {
   const ids: string[] = [];
   for (const org of orgManager.list()) {
-    for (const agent of org.agents) {
-      ids.push(`org_${org.id}_${agent.id}`);
-    }
+    for (const agent of org.agents) ids.push(`org_${org.id}_${agent.id}`);
   }
   return ids;
+}
+
+export function getRunningAgentsSet(): Set<string> {
+  return runningAgents; // FIX-AF: exposed for stale ticket reset on startup
 }

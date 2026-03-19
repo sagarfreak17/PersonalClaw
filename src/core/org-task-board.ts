@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { orgManager } from './org-manager.js';
 import { eventBus, Events } from './events.js';
 // FIX-L: per-org write lock prevents ticket file corruption under concurrent agents
 import { skillLock } from './skill-lock.js';
 
-const ORGS_DIR = path.join(process.cwd(), 'memory', 'orgs');
+const ORGS_DIR = path.join(process.cwd(), 'orgs');
 
 export type TicketStatus = 'open' | 'in_progress' | 'blocked' | 'done';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -46,7 +47,8 @@ class OrgTaskBoard {
   private cache: Map<string, Ticket[]> = new Map();
 
   private ticketsFile(orgId: string): string {
-    return path.join(ORGS_DIR, orgId, 'tickets.json');
+    const org = orgManager.get(orgId);
+    return path.join(org?.orgDir ?? path.join(ORGS_DIR, orgId), 'tickets.json');
   }
 
   private load(orgId: string): Ticket[] {
@@ -66,14 +68,22 @@ class OrgTaskBoard {
     const file = this.ticketsFile(orgId);
     const dir = path.dirname(file);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(tickets, null, 2));
+    const tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(tickets, null, 2));
+    fs.renameSync(tmp, file);
     this.cache.set(orgId, tickets);
   }
 
-  list(orgId: string, filter?: { assigneeId?: string; status?: TicketStatus }): Ticket[] {
+  list(orgId: string, filter?: { assigneeId?: string; status?: TicketStatus; callerAgentId?: string }): Ticket[] {
     let tickets = this.load(orgId);
-    if (filter?.assigneeId) tickets = tickets.filter(t => t.assigneeId === filter.assigneeId);
     if (filter?.status) tickets = tickets.filter(t => t.status === filter.status);
+    if (filter?.assigneeId) tickets = tickets.filter(t => t.assigneeId === filter.assigneeId);
+    // FIX-Z: hide in_progress tickets from agents who aren't the assignee
+    if (filter?.callerAgentId) {
+      tickets = tickets.filter(t =>
+        t.status !== 'in_progress' || t.assigneeId === filter.callerAgentId
+      );
+    }
     return tickets;
   }
 
@@ -158,6 +168,21 @@ class OrgTaskBoard {
       const now = new Date().toISOString();
 
       if (updates.status) {
+        // In update() — when status moves to in_progress, lock to current assignee
+        if (updates.status === 'in_progress' && updates.callerAgentId) {
+          // Only allow the current assignee to pick it up
+          if (ticket.assigneeId && ticket.assigneeId !== updates.callerAgentId) {
+            // Release lock — don't throw, just return null-like indication
+            return null;
+          }
+          // Auto-assign to caller if unassigned
+          if (!ticket.assigneeId) {
+            ticket.assigneeId = updates.callerAgentId;
+            const org = orgManager.get(orgId);
+            const agent = org?.agents.find(a => a.id === updates.callerAgentId);
+            ticket.assigneeLabel = agent ? `${agent.name} (${agent.role})` : updates.callerAgentId;
+          }
+        }
         ticket.status = updates.status;
         if (updates.status === 'done') ticket.completedAt = now;
       }

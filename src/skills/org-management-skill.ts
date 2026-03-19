@@ -5,10 +5,10 @@ import type { Skill, SkillMeta } from '../types/skill.js';
 export const orgManagementSkill: Skill = {
   name: 'manage_org',
   description: `Manage PersonalClaw AI organisations and their agents. Actions:
-- create_org: Create a new organisation (requires name, mission, rootDir)
+- create_org: Create a new organisation (requires name, mission)
 - list_orgs: List all organisations
 - delete_org: Delete an org (requires orgId)
-- add_agent: Add an agent to an org (requires orgId, name, role, personality, responsibilities, heartbeatCron)
+- add_agent: Add an agent to an org (requires orgId, name, role, personality, responsibilities, heartbeatCron. allowDuplicateRole: boolean)
 - list_agents: List agents in an org (requires orgId)
 - remove_agent: Remove an agent (requires orgId, agentId)
 - trigger_agent: Manually trigger an agent's heartbeat (requires orgId, agentId)
@@ -34,6 +34,7 @@ Use this when the user asks you to set up an org, define an agent, or manage the
       autonomyLevel: { type: 'string', enum: ['full', 'approval_required'] },
       heartbeatCron: { type: 'string' },
       reportingTo: { type: 'string' },
+      allowDuplicateRole: { type: 'boolean' },
     },
     required: ['action'],
   },
@@ -48,6 +49,8 @@ Use this when the user asks you to set up an org, define an agent, or manage the
           orgManager.delete(args.orgId);
           return { success: true };
         case 'add_agent': {
+          // Auto-set reportingTo to calling agent if called by an org agent
+          const callerReportingTo = _meta.orgAgentId ?? (args.reportingTo ?? null);
           const agent = orgManager.addAgent(args.orgId, {
             name: args.name,
             role: args.role,
@@ -56,7 +59,8 @@ Use this when the user asks you to set up an org, define an agent, or manage the
             goals: args.goals ?? [],
             autonomyLevel: (args.autonomyLevel ?? 'full') as AutonomyLevel,
             heartbeatCron: args.heartbeatCron ?? '0 9 * * *',
-            reportingTo: args.reportingTo ?? null,
+            reportingTo: callerReportingTo,
+            allowDuplicateRole: args.allowDuplicateRole ?? false,
           });
           // FIX-N: direct method call — scheduleAgent is public
           orgHeartbeat.scheduleAgent(args.orgId, agent.id);

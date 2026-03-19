@@ -35,3 +35,9 @@ check_ssl.ps1
 
 # AI Generated Outputs
 outputs/
+
+# AI Org workspaces — agent output excluded from git
+orgs/
+
+# Logs
+logs/

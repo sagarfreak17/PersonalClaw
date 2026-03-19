@@ -3,6 +3,7 @@ import * as path from 'path';
 import { orgTaskBoard, TicketPriority } from '../core/org-task-board.js';
 import { orgManager } from '../core/org-manager.js';
 import { eventBus, Events } from '../core/events.js';
+import { skillLock } from '../core/skill-lock.js';
 import type { Skill, SkillMeta } from '../types/skill.js';
 
 // ─── org_read_agent_memory ────────────────────────────────────────
@@ -77,15 +78,33 @@ export const orgWriteSharedMemorySkill: Skill = {
   run: async (args: any, meta: SkillMeta) => {
     if (!meta.orgId) return { error: 'Not running in org context' };
     const file = orgManager.getSharedMemoryFile(meta.orgId);
-    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : { decisions: [], announcements: [] };
-    fs.writeFileSync(file, JSON.stringify({
-      ...existing,
-      orgId: meta.orgId,
-      lastUpdated: new Date().toISOString(),
-      companyState: args.companyState ?? existing.companyState,
-      announcements: [...(existing.announcements ?? []), ...(args.announcements ?? [])],
-      decisions: [...(existing.decisions ?? []), ...(args.decisions ?? [])],
-    }, null, 2));
+    
+    // FIX-AC: re-read inside write to merge arrays, not overwrite
+    const lock = await skillLock.acquireWrite('memory', {
+      agentId: meta.agentId ?? meta.orgAgentId ?? 'unknown',
+      conversationId: meta.conversationId ?? '',
+      conversationLabel: meta.conversationLabel ?? '',
+      operation: 'shared_memory:write',
+      acquiredAt: new Date(),
+    });
+    
+    try {
+      const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : { decisions: [], announcements: [] };
+      const updated = {
+        ...existing,
+        orgId: meta.orgId,
+        lastUpdated: new Date().toISOString(),
+        companyState: args.companyState ?? existing.companyState,
+        // Merge arrays — don't overwrite
+        announcements: [...(existing.announcements ?? []), ...(args.announcements ?? [])],
+        decisions: [...(existing.decisions ?? []), ...(args.decisions ?? [])],
+      };
+      const tmp = file + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(updated, null, 2));
+      fs.renameSync(tmp, file);
+    } finally {
+      lock();
+    }
     return { success: true };
   },
 };
@@ -104,10 +123,11 @@ export const orgListTicketsSkill: Skill = {
   },
   run: async (args: any, meta: SkillMeta) => {
     if (!meta.orgId) return { error: 'Not running in org context' };
-    const filter: any = {};
-    if (args.assignedToMe) filter.assigneeId = meta.orgAgentId;
-    if (args.status) filter.status = args.status;
-    return { tickets: orgTaskBoard.list(meta.orgId, filter) };
+    return { tickets: orgTaskBoard.list(meta.orgId, {
+      assigneeId: args.assignedToMe ? meta.orgAgentId : undefined,
+      status: args.status,
+      callerAgentId: meta.orgAgentId,  // FIX-Z
+    }) };
   },
 };
 
@@ -193,18 +213,29 @@ export const orgDelegateSkill: Skill = {
       title: { type: 'string' },
       description: { type: 'string' },
       priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+      delegationDepth: { type: 'number', description: 'Internal — delegation chain depth. Do not set manually.' },
     },
     required: ['toAgentId', 'toAgentLabel', 'title', 'description', 'priority'],
   },
   run: async (args: any, meta: SkillMeta) => {
     if (!meta.orgId || !meta.orgAgentId) return { error: 'Not running in org context' };
+    
+    // FIX-AB: delegation loop detection
+    const delegationDepth = (args.delegationDepth ?? 0) + 1;
+    if (delegationDepth > 5) {
+      return {
+        success: false,
+        error: 'Delegation chain depth limit reached (5). This looks like a delegation loop. Resolve manually.',
+      };
+    }
+
     const org = orgManager.get(meta.orgId);
     const fromAgent = org?.agents.find(a => a.id === meta.orgAgentId);
     const fromLabel = fromAgent ? `${fromAgent.role} (${fromAgent.name})` : meta.orgAgentId;
     const ticket = await orgTaskBoard.create({
       orgId: meta.orgId,
       title: args.title,
-      description: args.description,
+      description: `${args.description}\n\n[delegation_depth:${delegationDepth}]`,
       priority: args.priority as TicketPriority,
       assigneeId: args.toAgentId,
       assigneeLabel: args.toAgentLabel,
@@ -240,9 +271,19 @@ export const orgWriteReportSkill: Skill = {
     if (!meta.orgId) return { error: 'Not running in org context' };
     const org = orgManager.get(meta.orgId);
     if (!org) return { error: 'Org not found' };
-    const baseDir = args.subdirectory ? path.join(org.rootDir, args.subdirectory) : org.rootDir;
+    
+    const agent = org.agents.find(a => a.id === meta.orgAgentId);
+    const roleSlug = (agent?.role ?? 'agent').toLowerCase().replace(/\s+/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    
+    // FIX-AH: enforce unique filename — {role}-{timestamp}-{original}
+    const safeFilename = `${roleSlug}-${timestamp}-${args.filename}`;
+    const baseDir = args.subdirectory
+      ? path.join(org.workspaceDir, args.subdirectory)
+      : path.join(org.workspaceDir, 'reports');
+      
     if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
-    const filePath = path.join(baseDir, args.filename);
+    const filePath = path.join(baseDir, safeFilename);
     fs.writeFileSync(filePath, args.content, 'utf-8');
     return { success: true, path: filePath };
   },
@@ -264,15 +305,121 @@ export const orgNotifySkill: Skill = {
     if (!meta.orgId) return { error: 'Not running in org context' };
     const org = orgManager.get(meta.orgId);
     const agent = org?.agents.find(a => a.id === meta.orgAgentId);
+
+    // FIX-AD: rate limit — max 5 notifications per run
+    const { activeRunIds, incrementNotifyCounter } = await import('../core/org-agent-runner.js');
+    const runId = activeRunIds.get(meta.orgAgentId ?? '') ?? 'unknown';
+    const allowed = incrementNotifyCounter(runId);
+    
+    // Always store — only suppress Telegram when over limit
+    const { storeNotification } = await import('../core/org-notification-store.js');
+    storeNotification({
+      orgId: meta.orgId,
+      orgName: org?.name ?? '',
+      agentName: agent ? `${agent.name} (${agent.role})` : 'Unknown',
+      message: args.message,
+      level: args.level ?? 'info',
+      type: 'agent',
+      timestamp: Date.now(),
+    });
+    
+    if (!allowed) {
+      return { success: true, message: 'Stored. Telegram suppressed — notification rate limit reached for this run (max 5).' };
+    }
+    
     eventBus.dispatch('org:notification', {
       orgId: meta.orgId,
       orgName: org?.name,
-      agentName: agent ? `${agent.name} (${agent.role})` : 'Unknown Agent',
+      agentName: agent ? `${agent.name} (${agent.role})` : 'Unknown',
       message: args.message,
       level: args.level ?? 'info',
-      timestamp: Date.now(),
+      timestamp: Date.now()
     }, 'org-skills');
+    
     return { success: true };
+  },
+};
+
+// ─── org_propose_code_change ──────────────────────────────────────
+export const orgProposeCodeChangeSkill: Skill = {
+  name: 'org_propose_code_change',
+  description: 'Propose a change to a protected project file. The human owner will review and approve or reject. Use this when you need to modify source code files that are tracked by git.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filePath: { type: 'string', description: 'Absolute path to the file you want to change.' },
+      proposedContent: { type: 'string', description: 'The full proposed content of the file after your change.' },
+      explanation: { type: 'string', description: 'Clear explanation of what you changed and why.' },
+    },
+    required: ['filePath', 'proposedContent', 'explanation'],
+  },
+  run: async (args: any, meta: SkillMeta) => {
+    if (!meta.orgId || !meta.orgAgentId) return { error: 'Not running in org context' };
+    const org = orgManager.get(meta.orgId);
+    if (!org) return { error: 'Org not found' };
+    const agent = org.agents.find(a => a.id === meta.orgAgentId);
+    const { createProposal } = await import('../core/org-file-guard.js');
+    const result = createProposal({
+      orgId: meta.orgId,
+      agentId: meta.orgAgentId,
+      agentLabel: agent ? `${agent.name} (${agent.role})` : meta.orgAgentId,
+      absolutePath: path.resolve(args.filePath),
+      proposedContent: args.proposedContent,
+      explanation: args.explanation,
+    });
+    return result;
+  },
+};
+
+// ─── org_raise_blocker ────────────────────────────────────────────
+export const orgRaiseBlockerSkill: Skill = {
+  name: 'org_raise_blocker',
+  description: 'Raise a blocker that requires human intervention. Use when you are stuck and cannot proceed without the human owner taking action (e.g., credentials needed, access required, ambiguous requirements).',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Short title for the blocker.' },
+      description: { type: 'string', description: 'Detailed description of the problem.' },
+      workaroundAttempted: { type: 'string', description: 'What you tried to work around it. Say "None" if nothing was attempted.' },
+      humanActionRequired: { type: 'string', description: 'Specifically what the human needs to do to unblock you.' },
+      ticketId: { type: 'string', description: 'Optional ticket ID this blocker is related to.' },
+    },
+    required: ['title', 'description', 'humanActionRequired'],
+  },
+  run: async (args: any, meta: SkillMeta) => {
+    if (!meta.orgId || !meta.orgAgentId) return { error: 'Not running in org context' };
+    const org = orgManager.get(meta.orgId);
+    if (!org) return { error: 'Org not found' };
+    const agent = org.agents.find(a => a.id === meta.orgAgentId);
+    const agentLabel = agent ? `${agent.name} (${agent.role})` : meta.orgAgentId;
+
+    const blocker = {
+      id: `blocker_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      orgId: meta.orgId,
+      agentId: meta.orgAgentId,
+      agentLabel,
+      title: args.title,
+      description: args.description,
+      workaroundAttempted: args.workaroundAttempted ?? 'None',
+      humanActionRequired: args.humanActionRequired,
+      ticketId: args.ticketId ?? null,
+      status: 'open' as const,
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
+    };
+
+    // Persist to blockers.json with atomic write
+    const blockersFile = path.join(org.orgDir, 'blockers.json');
+    const existing = fs.existsSync(blockersFile)
+      ? JSON.parse(fs.readFileSync(blockersFile, 'utf-8'))
+      : [];
+    existing.push(blocker);
+    const tmp = blockersFile + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(existing, null, 2));
+    fs.renameSync(tmp, blockersFile);
+
+    eventBus.dispatch('org:blocker:created', { blocker }, 'org-skills');
+    return { success: true, blocker };
   },
 };
 
@@ -287,4 +434,6 @@ export const orgSkills: Skill[] = [
   orgDelegateSkill,
   orgWriteReportSkill,
   orgNotifySkill,
+  orgProposeCodeChangeSkill,
+  orgRaiseBlockerSkill,
 ];

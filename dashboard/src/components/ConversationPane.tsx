@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, WorkerAgentInfo, WorkerLog } from '../types/conversation';
+import type { ToolFeedItem } from '../types/org';
 import { WorkerCard } from './WorkerCard';
 
 interface ConversationPaneProps {
@@ -14,6 +15,7 @@ interface ConversationPaneProps {
   selectedAgentLogs: WorkerLog | null;
   isWaiting: boolean;
   isSuperUser: boolean;
+  toolFeedItems?: ToolFeedItem[];
   showCloseButton: boolean;
   onSend: (text: string) => void;
   onClose: () => void;
@@ -89,6 +91,18 @@ export function ConversationPane(props: ConversationPaneProps) {
               </div>
             </div>
           ))}
+          {props.isSuperUser && props.toolFeedItems && props.toolFeedItems.length > 0 && (
+            <div className="tool-feed-inline">
+              {props.toolFeedItems.slice(-8).map((item, i) => (
+                <div key={i} className={`tool-feed-item tool-feed-item--${item.type}`}>
+                  <span className="tool-feed-icon">{item.type === 'started' ? '\u2699\uFE0F' : item.success === false ? '\u274C' : '\u2705'}</span>
+                  <code>{item.tool}</code>
+                  {item.durationMs && <span className="tool-feed-duration">{item.durationMs}ms</span>}
+                  <span className="tool-feed-time">{new Date(item.timestamp).toLocaleTimeString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {props.isWaiting && (
             <div className="message-bubble assistant">
               <div className="message-avatar">🤖</div>

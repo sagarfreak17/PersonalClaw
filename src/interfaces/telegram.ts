@@ -59,6 +59,20 @@ export class TelegramInterface {
     });
   }
 
+  async sendMessage(message: string): Promise<void> {
+    if (!this.bot) return;
+    const authorizedId = process.env.AUTHORIZED_CHAT_ID;
+    if (!authorizedId) {
+      console.warn('[Telegram] Cannot send proactive message: AUTHORIZED_CHAT_ID not set.');
+      return;
+    }
+    try {
+      await this.bot.telegram.sendMessage(authorizedId, message);
+    } catch (err) {
+      console.error('[Telegram] Failed to send message:', err);
+    }
+  }
+
   stop() {
     if (this.bot) this.bot.stop('SIGINT');
   }

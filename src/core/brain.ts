@@ -290,6 +290,7 @@ export interface BrainConfig {
   historyDir?: string;             // Override directory for saveHistory() — FIX-H
   orgId?: string;                  // Set on org agents for SkillMeta
   orgAgentId?: string;
+  toolCallInterceptor?: (name: string, args: any, meta: SkillMeta) => Promise<any>; // FIX-S
 }
 
 // Exclusive-lock skills that must not run in parallel within the same Brain
@@ -385,9 +386,10 @@ export class Brain {
     // Workers never get spawn_agent
     let toolDefs = getToolDefinitions();
     if (this.isWorker) {
-      toolDefs = toolDefs.filter((t: any) =>
-        t.functionDeclarations[0].name !== 'spawn_agent'
-      );
+      toolDefs = toolDefs.filter((t: any) => {
+        const name = t.functionDeclarations[0].name;
+        return name !== 'spawn_agent' && name !== 'manage_org'; // FIX-AJ
+      });
     }
     // FIX-K: apply custom tool filter (e.g. remove manage_scheduler for org agents)
     if (this.toolFilter) {
@@ -760,7 +762,7 @@ need to do and ask the parent conversation to confirm before acting.`;
       const modelName = modelInfo ? `${modelInfo.name} (\`${this.activeModelId}\`)` : `\`${this.activeModelId}\``;
 
       const failoverHistory = this.failoverAttempts.size > 0
-        ? `\n- **Failovers**: ${[...this.failoverAttempts.entries()].map(([m, c]) => `\`${m}\` failed ${c}x`).join(', ')}`
+        ? `\n- **Failovers**: ${Array.from(this.failoverAttempts.entries()).map(([m, c]) => `\`${m}\` failed ${c}x`).join(', ')}`
         : '';
 
       const barLen = 20;
@@ -1363,11 +1365,13 @@ need to do and ask the parent conversation to confirm before acting.`;
 
           // Check extra skills first (org skills, etc.), then Chrome MCP, then standard skills
           const extraSkill = this.extraSkills.find(s => s.name === name);
-          const output = extraSkill
-            ? await extraSkill.run(args, meta)
-            : chromeNativeAdapter.isChromeMCPTool(name)
-              ? await chromeNativeAdapter.executeChromeTool(name, args)
-              : await handleToolCall(name, args, meta);
+          const output = this.config.toolCallInterceptor
+            ? await this.config.toolCallInterceptor(name, args, meta)
+            : extraSkill
+              ? await extraSkill.run(args, meta)
+              : chromeNativeAdapter.isChromeMCPTool(name)
+                ? await chromeNativeAdapter.executeChromeTool(name, args)
+                : await handleToolCall(name, args, meta);
           const elapsed = Date.now() - startTime;
           console.log(`[Brain:${this.agentId}] ${name} completed in ${elapsed}ms`);
           toolCallsThisRequest++;

@@ -3,6 +3,7 @@ import { browserManager } from '../core/browser.js';
 import { chromeNativeAdapter } from '../core/chrome-mcp.js';
 import { extensionRelay } from '../core/relay.js';
 import { skillLock } from '../core/skill-lock.js';
+import { orgManager } from '../core/org-manager.js';
 
 /**
  * Unified browser skill — the ONLY browser tool for PersonalClaw.
@@ -126,6 +127,13 @@ DECISION GUIDE:
         conversationLabel: meta.conversationLabel,
         operation: `browser:${action}`, acquiredAt: new Date(),
       });
+
+      // FIX-AI: Use org-specific browser profile when in org context
+      if (meta.orgId) {
+        const orgBrowserDir = orgManager.getBrowserDataDir(meta.orgId);
+        await browserManager.ensureProfileDir(orgBrowserDir);
+      }
+
       switch (action) {
 
         // ── Native Chrome Connection ──────────────────────────────────

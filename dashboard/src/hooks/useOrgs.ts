@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { Org, Ticket, OrgNotification } from '../types/org';
+import type { Org, Ticket, OrgNotification, CodeProposal, Blocker, FileActivityEntry } from '../types/org';
 
 export function useOrgs(socket: Socket) {
   const [orgs, setOrgs] = useState<Org[]>([]);
@@ -8,6 +8,9 @@ export function useOrgs(socket: Socket) {
   const [tickets, setTickets] = useState<Record<string, Ticket[]>>({});
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set());
   const [notifications, setNotifications] = useState<OrgNotification[]>([]);
+  const [proposals, setProposals] = useState<CodeProposal[]>([]);
+  const [blockers, setBlockers] = useState<Blocker[]>([]);
+  const [agentFileActivity, setAgentFileActivity] = useState<Record<string, FileActivityEntry[]>>({});
 
   const activeOrg = orgs.find(o => o.id === activeOrgId) ?? null;
 
@@ -51,6 +54,22 @@ export function useOrgs(socket: Socket) {
       setNotifications(prev => [notif, ...prev].slice(0, 50));
     };
 
+    const handleProposalsList = (d: any) => { if (d.orgId === activeOrgId) setProposals(d.proposals ?? []); };
+    const handleProposalUpdate = (d: any) => { if (d.orgId === activeOrgId) socket.emit('org:proposals:list', { orgId: activeOrgId }); };
+    const handleBlockersList = (d: any) => { if (d.orgId === activeOrgId) setBlockers(d.blockers ?? []); };
+    const handleBlockerUpdate = (d: any) => { if (d.orgId === activeOrgId) socket.emit('org:blockers:list', { orgId: activeOrgId }); };
+    const handleFileActivity = (d: any) => {
+      if (d.orgId === activeOrgId) {
+        setAgentFileActivity(prev => ({ ...prev, [d.agentId]: [...(prev[d.agentId] ?? []).slice(-50), ...(d.activity ?? [])] }));
+      }
+    };
+
+    socket.on('org:proposals:list', handleProposalsList);
+    socket.on('org:proposal:update', handleProposalUpdate);
+    socket.on('org:blockers:list', handleBlockersList);
+    socket.on('org:blocker:update', handleBlockerUpdate);
+    socket.on('org:agent:file_activity', handleFileActivity);
+
     socket.on('org:list', handleOrgList);
     socket.on('org:created', handleOrgCreated);
     socket.on('org:updated', handleOrgUpdated);
@@ -69,12 +88,21 @@ export function useOrgs(socket: Socket) {
       socket.off('org:tickets:list', handleTicketsList);
       socket.off('org:agent:run_update', handleRunUpdate);
       socket.off('org:notification', handleNotification);
+      socket.off('org:proposals:list', handleProposalsList);
+      socket.off('org:proposal:update', handleProposalUpdate);
+      socket.off('org:blockers:list', handleBlockersList);
+      socket.off('org:blocker:update', handleBlockerUpdate);
+      socket.off('org:agent:file_activity', handleFileActivity);
     };
-  }, [socket]);
+  }, [socket, activeOrgId]);
 
   useEffect(() => {
-    if (activeOrgId) socket.emit('org:tickets:list', { orgId: activeOrgId });
-  }, [activeOrgId]);
+    if (activeOrgId) {
+      socket.emit('org:tickets:list', { orgId: activeOrgId });
+      socket.emit('org:proposals:list', { orgId: activeOrgId });
+      socket.emit('org:blockers:list', { orgId: activeOrgId });
+    }
+  }, [activeOrgId, socket]);
 
   const createOrg = useCallback((p: { name: string; mission: string; rootDir: string }) => {
     socket.emit('org:create', p);
@@ -122,5 +150,6 @@ export function useOrgs(socket: Socket) {
     createOrg, updateOrg, deleteOrg,
     addAgent, updateAgent, deleteAgent, triggerAgent,
     createTicket, updateTicket,
+    proposals, blockers, agentFileActivity,
   };
 }

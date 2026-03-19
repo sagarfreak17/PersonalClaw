@@ -18,6 +18,7 @@ export class BrowserManager {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private initializing: Promise<void> | null = null;
+  private currentProfileDir: string = PROFILE_DIR;
 
   /**
    * Get the active page.
@@ -59,12 +60,12 @@ export class BrowserManager {
     console.log('[Browser] Launching Chromium with persistent profile...');
 
     // Ensure profile directory exists
-    if (!fs.existsSync(PROFILE_DIR)) {
-      fs.mkdirSync(PROFILE_DIR, { recursive: true });
+    if (!fs.existsSync(this.currentProfileDir)) {
+      fs.mkdirSync(this.currentProfileDir, { recursive: true });
     }
 
     // Use launchPersistentContext for login persistence across sessions
-    this.context = await chromium.launchPersistentContext(PROFILE_DIR, {
+    this.context = await chromium.launchPersistentContext(this.currentProfileDir, {
       headless: false,
       viewport: null,
       args: [
@@ -256,6 +257,16 @@ export class BrowserManager {
   /**
    * Close the browser entirely.
    */
+  async ensureProfileDir(profileDir: string): Promise<void> {
+    if (!fs.existsSync(profileDir)) fs.mkdirSync(profileDir, { recursive: true });
+    // Only switch profile if different from current
+    if (this.currentProfileDir !== profileDir) {
+      await this.close(); // close current browser
+      this.currentProfileDir = profileDir;
+      // Browser will relaunch with new profile on next getPage() call
+    }
+  }
+
   async close(): Promise<string> {
     await this.cleanup();
     return 'Browser closed.';

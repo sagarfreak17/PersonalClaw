@@ -2,6 +2,57 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.3.0] - 2026-03-20
+
+### Complete Dashboard UI Overhaul
+
+#### Light-Only Theme Redesign
+- Removed dark theme entirely — no more theme toggle, no dual-theme CSS maintenance
+- New clean color palette: deep indigo primary (`#4338ca`), bold accents for success/warning/danger
+- Page background changed from flat gray to a soft blue-to-lavender gradient
+- Bolder typography throughout — 800-weight headings, tighter letter spacing
+- Stronger borders (`#d1d5db`) and more visible shadows for depth
+- Status cards have colored top accent borders
+- All glass morphism / backdrop-filter effects removed for a clean, modern look
+
+#### Collapsible Sidebars (Azure Portal Style)
+- **Main sidebar**: collapse button at bottom shrinks to 60px icon-only rail; nav items show icons only with tooltips; smooth 200ms transition
+- **Org sidebar**: same pattern — collapses to avatar-only view; "+ New Org" becomes a "+" icon; toggle button at bottom
+
+#### Org Section — Complete Refactor
+- Org workspace wrapped in its own bordered container with shadow
+- Org sidebar has distinct background, active org gets left accent border
+- Header redesigned: 20px/800-weight title, proper action buttons with themed variants (warning, success, danger)
+- **Subtabs** changed from background-fill to underline-style active indicator (border-bottom accent)
+- **Notification dropdown** completely rebuilt with proper CSS classes (replaced broken inline styles using nonexistent CSS vars), z-index 200, color-coded items by level
+- "+ New Org" pinned to bottom of org sidebar (no empty space gap)
+- Paused org/agent opacity raised from 0.55 to 0.78 for better readability
+
+#### Agent Cards — Color-Coded
+- Each agent gets a unique color from a 10-color palette (indigo, violet, cyan, emerald, amber, red, pink, blue, etc.)
+- Color shown as 4px left border stripe and matching avatar background
+- Paused agents get neutral gray avatar instead of accent color
+- Agent names use 800-weight, roles use 500-weight
+
+#### Agent Chat Pane — Major Improvements
+- Changed from `position: fixed` overlay to flex child within org-workspace — no more full-page takeover
+- **Horizontally resizable** via drag handle (300px–700px range)
+- **Minimize button** (Minus icon) hides chat but preserves all messages
+- **Close button** (X) asks confirmation before destroying chat history
+- **Minimized chat bar** at bottom of org-main shows all minimized chats with message counts
+- Clicking a minimized tab restores the full chat with history intact
+- Re-clicking "Chat" on same agent reopens existing chat instead of creating duplicate
+
+#### Files Changed
+- **Rewritten**: `dashboard/src/index.css` — complete light-only theme, ~1700 lines
+- **Updated**: `dashboard/src/App.tsx` — removed theme toggle, added collapsible sidebar state, new icons
+- **Updated**: `dashboard/src/components/OrgWorkspace.tsx` — collapsible org sidebar, notification dropdown rebuild, minimized chat bar, color-coded agent cards
+- **Updated**: `dashboard/src/components/AgentCard.tsx` — per-agent color palette, index prop
+- **Updated**: `dashboard/src/components/AgentChatPane.tsx` — minimize/close split, header buttons
+- **Updated**: `dashboard/src/hooks/useOrgChat.ts` — `minimizeChat()` (hide without destroy), `openChat()` reuses existing chats
+
+---
+
 ## [12.2.1] - 2026-03-20
 
 ### Screenshot-to-Chat Restored

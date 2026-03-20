@@ -129,7 +129,7 @@ class OrgManager {
     fs.mkdirSync(workspaceDir, { recursive: true });
 
     const mode: ProtectionMode = params.protectionMode ?? 'git';
-    const rootDir = workspaceDir; // rootDir = workspaceDir on create
+    const rootDir = params.rootDir || workspaceDir;
     const gitFiles = (mode === 'git' || mode === 'both')
       ? snapshotGitFiles(rootDir)
       : [];
@@ -141,7 +141,7 @@ class OrgManager {
       id: `org_${Date.now()}`,
       name: params.name,
       mission: params.mission,
-      rootDir: workspaceDir,
+      rootDir,
       orgDir,
       workspaceDir,
       createdAt: new Date().toISOString(),

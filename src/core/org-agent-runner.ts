@@ -220,6 +220,91 @@ Your primary workspace is \`${org.rootDir}\`. You have full read/write access he
 - Keep your reports concise and actionable.${commentsFeedback}`;
 }
 
+/**
+ * Build a lighter system prompt for interactive chat sessions.
+ * Does NOT include the 11-step run sequence — the agent should behave
+ * as a conversational assistant, not execute an autonomous run.
+ */
+function buildOrgAgentChatPrompt(org: Org, agent: OrgAgent): string {
+  let agentMemory = 'No memory yet.';
+  try {
+    const memFile = orgManager.getAgentMemoryFile(org.id, agent.id);
+    if (fs.existsSync(memFile)) {
+      agentMemory = JSON.stringify(JSON.parse(fs.readFileSync(memFile, 'utf-8')), null, 2);
+    }
+  } catch { /* ignore */ }
+
+  let sharedMemory = 'No shared memory yet.';
+  try {
+    const sharedFile = orgManager.getSharedMemoryFile(org.id);
+    if (fs.existsSync(sharedFile)) {
+      sharedMemory = JSON.stringify(JSON.parse(fs.readFileSync(sharedFile, 'utf-8')), null, 2);
+    }
+  } catch { /* ignore */ }
+
+  const colleagues = org.agents
+    .filter(a => a.id !== agent.id)
+    .map(a => `- ${a.name} (${a.role}) — ID: ${a.id}`)
+    .join('\n') || 'None yet.';
+
+  const now = new Date().toLocaleString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+  });
+
+  return `# ${org.name} — Direct Chat
+
+You are **${agent.name}**, the **${agent.role}** at ${org.name}.
+
+**Current Time**: ${now}
+
+## Your Organisation
+**Name**: ${org.name}
+**Mission**: ${org.mission}
+
+## Your Colleagues
+${colleagues}
+
+## Your Identity
+**Role**: ${agent.role}
+**Personality**: ${agent.personality}
+
+## Your Responsibilities
+${agent.responsibilities}
+
+## Your Goals
+${agent.goals.map(g => `- ${g}`).join('\n')}
+
+## Your Memory
+\`\`\`json
+${agentMemory}
+\`\`\`
+
+## Shared Org Memory
+\`\`\`json
+${sharedMemory}
+\`\`\`
+
+---
+
+## Mode: Interactive Chat
+
+You are in a **direct conversation** with the human owner. This is NOT an autonomous heartbeat run.
+
+**Behaviour rules for chat mode:**
+- Respond conversationally to the human's messages.
+- Answer questions, discuss strategy, provide updates, and help with tasks as asked.
+- You have access to all your org tools (tickets, files, browser, delegation, etc.) — use them when the human asks you to do something.
+- Do NOT follow the 11-step heartbeat sequence. Do NOT automatically read memory, create tickets, write reports, or save memory unless the human specifically asks you to.
+- Do NOT call \`org_write_agent_memory\` unless the human explicitly asks you to save your memory.
+- Keep responses focused and conversational — you are chatting, not running an autonomous cycle.
+
+## Important Rules
+- Never impersonate other agents or write on their behalf.
+- Never modify another agent's private memory file.
+- You do NOT have access to \`execute_powershell\` or \`run_python_script\`.`;
+}
+
 // ─── Brain Factory & Interceptors ─────────────────────────────────
 
 export interface FileActivityEntry {
@@ -287,11 +372,11 @@ async function checkAndSummariseMemory(orgId: string, agentId: string): Promise<
   } catch (e) { console.warn(`[OrgAgentRunner] Memory summarisation failed for ${agentId}:`, e); }
 }
 
-async function createOrgAgentBrain(org: Org, agent: OrgAgent, activityLog: FileActivityEntry[]): Promise<any> {
+async function createOrgAgentBrain(org: Org, agent: OrgAgent, activityLog: FileActivityEntry[], isChat = false): Promise<any> {
   // FIX-A: Lazy dynamic import breaks circular dependency
   const { Brain } = await import('./brain.js');
 
-  const systemPromptOverride = buildOrgAgentSystemPrompt(org, agent);
+  const systemPromptOverride = isChat ? buildOrgAgentChatPrompt(org, agent) : buildOrgAgentSystemPrompt(org, agent);
   const historyDir = orgManager.getAgentMemoryDir(org.id, agent.id);
 
   const brain = new Brain({
@@ -375,18 +460,20 @@ export async function runOrgAgent(
     let brain: any;
     if (trigger === 'chat' && chatId) {
       if (!chatBrains.has(chatId)) {
-        brain = await createOrgAgentBrain(org, agent, activityLog);
+        brain = await createOrgAgentBrain(org, agent, activityLog, true);
         chatBrains.set(chatId, brain);
       } else {
         brain = chatBrains.get(chatId);
-        brain.updateSystemPromptOverride(buildOrgAgentSystemPrompt(org, agent));
+        brain.updateSystemPromptOverride(buildOrgAgentChatPrompt(org, agent));
       }
       chatBrainLastActivity.set(chatId, Date.now());
     } else {
       brain = await createOrgAgentBrain(org, agent, activityLog);
     }
 
-    const prompt = messageOverride ?? `[HEARTBEAT:${trigger.toUpperCase()}] You have been activated. Begin your run now.`;
+    const prompt = trigger === 'chat'
+      ? (messageOverride ?? '')
+      : (messageOverride ?? `[HEARTBEAT:${trigger.toUpperCase()}] You have been activated. Begin your run now.`);
     const response = await brain.processMessage(prompt);
     const durationMs = Date.now() - startMs;
     const completedAt = new Date().toISOString();

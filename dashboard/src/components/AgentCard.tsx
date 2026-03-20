@@ -6,9 +6,15 @@ const STATUS_COLORS: Record<string, string> = {
   failed: '#ef4444', paused: '#f59e0b', skipped: '#6b7280',
 };
 
+const AGENT_COLORS = [
+  '#4338ca', '#7c3aed', '#0891b2', '#059669', '#d97706',
+  '#dc2626', '#db2777', '#2563eb', '#4f46e5', '#0d9488',
+];
+
 interface AgentCardProps {
   agent: OrgAgent;
   allAgents: OrgAgent[];
+  index?: number;
   isRunning: boolean;
   onTrigger: () => void;
   onChat: () => void;
@@ -18,7 +24,7 @@ interface AgentCardProps {
   onEdit: (updates: any) => void;
 }
 
-export function AgentCard({ agent, allAgents, isRunning, onTrigger, onChat, onPause, onResume, onDelete, onEdit }: AgentCardProps) {
+export function AgentCard({ agent, allAgents, index = 0, isRunning, onTrigger, onChat, onPause, onResume, onDelete, onEdit }: AgentCardProps) {
   const [showEdit, setShowEdit] = useState(false);
   const status = agent.paused ? 'paused' : isRunning ? 'running' : (agent.lastRunStatus ?? 'sleeping');
   const statusLabel = agent.paused ? 'Paused' : isRunning ? 'Running…'
@@ -27,10 +33,12 @@ export function AgentCard({ agent, allAgents, isRunning, onTrigger, onChat, onPa
     : 'Sleeping';
   const lastRun = agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleString() : 'Never';
 
+  const agentColor = agent.paused ? '#6b7280' : AGENT_COLORS[index % AGENT_COLORS.length];
+
   return (
-    <div className={`agent-card ${agent.paused ? 'agent-card--paused' : ''}`}>
+    <div className={`agent-card ${agent.paused ? 'agent-card--paused' : ''}`} style={{ borderLeft: `4px solid ${agentColor}` }}>
       <div className="agent-card-header">
-        <div className="agent-avatar">{agent.name.charAt(0).toUpperCase()}</div>
+        <div className="agent-avatar" style={{ background: agentColor }}>{agent.name.charAt(0).toUpperCase()}</div>
         <div className="agent-info">
           <div className="agent-name">{agent.name}</div>
           <div className="agent-role">{agent.role}</div>

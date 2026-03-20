@@ -142,7 +142,7 @@ export function useOrgs(socket: Socket) {
     }
   }, [activeOrgId, socket]);
 
-  const createOrg = useCallback((p: { name: string; mission: string; rootDir: string }) => {
+  const createOrg = useCallback((p: { name: string; mission: string; rootDir: string; protectionMode?: string; manualPaths?: string[] }) => {
     socket.emit('org:create', p);
   }, [socket]);
 

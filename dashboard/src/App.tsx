@@ -11,8 +11,6 @@ import {
   Shield,
   LayoutDashboard,
   Activity,
-  Sun,
-  Moon,
   Clock,
   HardDrive,
   Cpu,
@@ -27,6 +25,9 @@ import {
   Wifi,
   WifiOff,
   ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sparkles,
   ArrowUp,
@@ -70,7 +71,6 @@ const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [metrics, setMetrics] = useState({ cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' });
-  const [isLightTheme, setIsLightTheme] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [pendingScreenshot, setPendingScreenshot] = useState<string | null>(null);
@@ -85,6 +85,7 @@ const App: React.FC = () => {
   const [ramHistory, setRamHistory] = useState<number[]>([]);
   const [toasts, setToasts] = useState<{ id: string; text: string; type: 'info' | 'success' | 'error' }[]>([]);
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const commandPaletteRef = useRef<HTMLInputElement>(null);
 
@@ -166,14 +167,6 @@ const App: React.FC = () => {
     }
   }, [messages, isBotTyping, activeTab]);
 
-  // ── Theme ──
-  useEffect(() => {
-    if (isLightTheme) {
-      document.body.classList.add('light-theme');
-    } else {
-      document.body.classList.remove('light-theme');
-    }
-  }, [isLightTheme]);
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
@@ -318,66 +311,76 @@ const App: React.FC = () => {
   return (
     <div className="dashboard-container">
       {/* ── Sidebar ── */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarCollapsed ? 'sidebar--collapsed' : ''}`}>
         <div className="sidebar-brand">
           <Sparkles size={22} style={{ color: 'var(--accent-primary)' }} />
-          <h1>PersonalClaw</h1>
+          {!sidebarCollapsed && <h1>PersonalClaw</h1>}
         </div>
-        <div className="version-badge">v12.2</div>
+        {!sidebarCollapsed && <div className="version-badge">v12.2</div>}
 
         <nav style={{ flex: 1 }}>
           <ul style={{ listStyle: 'none' }}>
-            <li className={`nav-item ${activeTab === 'command' ? 'active' : ''}`} onClick={() => setActiveTab('command')}>
+            <li className={`nav-item ${activeTab === 'command' ? 'active' : ''}`} onClick={() => setActiveTab('command')} title="Command Center">
               <Terminal size={18} />
-              <span>Command Center</span>
+              {!sidebarCollapsed && <span>Command Center</span>}
             </li>
-            <li className={`nav-item ${activeTab === 'metrics' ? 'active' : ''}`} onClick={() => setActiveTab('metrics')}>
+            <li className={`nav-item ${activeTab === 'metrics' ? 'active' : ''}`} onClick={() => setActiveTab('metrics')} title="System Metrics">
               <Activity size={18} />
-              <span>System Metrics</span>
+              {!sidebarCollapsed && <span>System Metrics</span>}
             </li>
-            <li className={`nav-item ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')}>
+            <li className={`nav-item ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')} title="Activity Feed">
               <Zap size={18} />
-              <span>Activity Feed</span>
+              {!sidebarCollapsed && <span>Activity Feed</span>}
               {activityFeed.length > 0 && (
                 <span className="badge">{activityFeed.length}</span>
               )}
             </li>
-            <li className={`nav-item ${activeTab === 'skills' ? 'active' : ''}`} onClick={() => setActiveTab('skills')}>
+            <li className={`nav-item ${activeTab === 'skills' ? 'active' : ''}`} onClick={() => setActiveTab('skills')} title="Skills & Config">
               <Settings size={18} />
-              <span>Skills & Config</span>
+              {!sidebarCollapsed && <span>Skills & Config</span>}
             </li>
             <li className={`nav-item ${activeTab === 'orgs' ? 'active' : ''}`} onClick={() => setActiveTab('orgs')} title="AI Organisations">
               <Building2 size={18} />
-              <span>Orgs</span>
+              {!sidebarCollapsed && <span>Orgs</span>}
             </li>
           </ul>
         </nav>
 
         {/* Quick actions */}
-        <div className="quick-actions">
-          <button className="quick-btn" onClick={() => setShowCommandPalette(true)} title="Command Palette (Ctrl+K)">
-            <Search size={16} />
-            <span>Commands</span>
-            <kbd>Ctrl+K</kbd>
-          </button>
-        </div>
+        {!sidebarCollapsed && (
+          <div className="quick-actions">
+            <button className="quick-btn" onClick={() => setShowCommandPalette(true)} title="Command Palette (Ctrl+K)">
+              <Search size={16} />
+              <span>Commands</span>
+              <kbd>Ctrl+K</kbd>
+            </button>
+          </div>
+        )}
+        {sidebarCollapsed && (
+          <div className="quick-actions">
+            <button className="quick-btn" onClick={() => setShowCommandPalette(true)} title="Command Palette (Ctrl+K)" style={{ justifyContent: 'center' }}>
+              <Search size={16} />
+            </button>
+          </div>
+        )}
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '12px' }}>
-          <button
-            className="theme-toggle"
-            onClick={() => setIsLightTheme(!isLightTheme)}
-            title="Toggle Light/Dark Mode"
-          >
-            {isLightTheme ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
-          <div className="agent-status">
-            <div className={`dot ${connected ? 'green' : 'red'}`} />
+        <div className="agent-status" style={{ marginTop: '8px' }}>
+          <div className={`dot ${connected ? 'green' : 'red'}`} />
+          {!sidebarCollapsed && (
             <div style={{ fontSize: '0.75rem' }}>
               <div style={{ color: 'var(--text-dim)' }}>Agent</div>
               <div style={{ fontWeight: 600 }}>{connected ? 'Online' : 'Offline'}</div>
             </div>
-          </div>
+          )}
         </div>
+
+        <button
+          className="sidebar-collapse-btn"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </aside>
 
       {/* ── Main Content ── */}

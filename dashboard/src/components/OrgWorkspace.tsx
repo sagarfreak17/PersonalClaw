@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
-import { Bell, X } from 'lucide-react';
+import { Bell, X, MessageSquare, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 import { useOrgs } from '../hooks/useOrgs';
 import { useOrgChat } from '../hooks/useOrgChat';
@@ -31,7 +31,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
   } = useOrgs(socket);
 
   const {
-    chats, openChatId, openChat, closeChat, sendMessage, abortMessage, readMemory,
+    chats, openChatId, setOpenChatId, openChat, closeChat, minimizeChat, sendMessage, abortMessage, readMemory,
   } = useOrgChat(socket);
 
   const [subTab, setSubTab] = useState<OrgSubTab>('agents');
@@ -41,11 +41,15 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
   const [memoryContent, setMemoryContent] = useState<any>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [orgSidebarCollapsed, setOrgSidebarCollapsed] = useState(false);
 
   const notifRef = useRef<HTMLDivElement>(null);
 
   const orgTickets = activeOrg ? (tickets[activeOrg.id] ?? []) : [];
   const orgNotifications = activeOrg ? notifications.filter(n => n.orgId === activeOrg.id) : [];
+
+  // Collect minimized chats (have messages but not currently open)
+  const minimizedChats = Object.values(chats).filter(c => c.chatId !== openChatId);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,8 +61,6 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications]);
 
-
-  // FIX-O: use correlationId-based readMemory from useOrgChat
   const handleReadMemory = useCallback(async (agentId?: string) => {
     if (!activeOrg) return;
     setMemoryLoading(true);
@@ -90,13 +92,14 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
   return (
     <div className="org-workspace">
       {/* Org Sidebar */}
-      <div className="org-sidebar">
-        <div className="org-sidebar-header">Organisations</div>
+      <div className={`org-sidebar ${orgSidebarCollapsed ? 'org-sidebar--collapsed' : ''}`}>
+        {!orgSidebarCollapsed && <div className="org-sidebar-header">Organisations</div>}
         {orgs.map(org => (
           <button
             key={org.id}
             className={`org-switcher-item ${org.id === activeOrgId ? 'active' : ''} ${org.paused ? 'paused' : ''}`}
             onClick={() => setActiveOrgId(org.id)}
+            title={orgSidebarCollapsed ? `${org.name} (${org.agents.length} agents)` : undefined}
           >
             <div className="org-switcher-avatar">{org.name.charAt(0)}</div>
             <div className="org-switcher-info">
@@ -107,11 +110,19 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
           </button>
         ))}
         <button className="org-create-btn" onClick={() => setShowCreateOrg(true)}>+ New Org</button>
+        <button
+          className="org-sidebar-toggle"
+          onClick={() => setOrgSidebarCollapsed(!orgSidebarCollapsed)}
+          title={orgSidebarCollapsed ? 'Expand org list' : 'Collapse org list'}
+        >
+          {orgSidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+        </button>
       </div>
 
       {/* Main Area */}
       {activeOrg && (
         <div className="org-main">
+          {/* Header */}
           <div className="org-header">
             <div className="org-header-info">
               <h2>{activeOrg.name}</h2>
@@ -119,69 +130,40 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
               <code className="org-rootdir">{activeOrg.rootDir}</code>
             </div>
             <div className="org-header-actions">
-              <div ref={notifRef} style={{ position: 'relative', display: 'inline-block', marginRight: '8px' }}>
-                <button 
-                  className="btn-sm" 
+              {/* Notifications */}
+              <div ref={notifRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  className="org-action-btn"
                   onClick={() => setShowNotifications(!showNotifications)}
-                  style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Bell size={16} /> Notifications
+                  <Bell size={15} />
+                  <span>Notifications</span>
                   {orgNotifications.length > 0 && (
-                    <span style={{ 
-                      background: 'var(--accent-primary)', 
-                      color: '#fff', 
-                      borderRadius: '12px', 
-                      padding: '2px 6px', 
-                      fontSize: '0.7rem', 
-                      fontWeight: 'bold',
-                      marginLeft: '4px'
-                    }}>
-                      {orgNotifications.length}
-                    </span>
+                    <span className="org-notif-badge">{orgNotifications.length}</span>
                   )}
                 </button>
                 {showNotifications && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    right: 0, 
-                    top: '110%', 
-                    width: '350px', 
-                    maxHeight: '400px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    background: 'var(--bg-panel)', 
-                    border: '1px solid var(--border-color)', 
-                    borderRadius: '8px', 
-                    zIndex: 100, 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)', 
-                    overflow: 'hidden' 
-                  }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-darker)' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Notifications</h4>
-                      <button onClick={() => setShowNotifications(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0 }}>
-                        <X size={16} />
+                  <div className="org-notif-dropdown">
+                    <div className="org-notif-dropdown-header">
+                      <h4>Notifications</h4>
+                      <button onClick={() => setShowNotifications(false)}>
+                        <X size={14} />
                       </button>
                     </div>
-                    <div style={{ overflowY: 'auto', flex: 1, padding: '8px' }}>
+                    <div className="org-notif-dropdown-body">
                       {orgNotifications.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem', padding: '20px 0' }}>No notifications yet.</p>
+                        <p className="org-notif-empty">No notifications yet.</p>
                       ) : (
                         orgNotifications.map((notif, i) => (
-                          <div key={i} style={{ 
-                            padding: '10px', 
-                            borderBottom: '1px solid var(--border-color)', 
-                            fontSize: '0.85rem',
-                            background: notif.level === 'error' ? 'rgba(239, 68, 68, 0.1)' : notif.level === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                            borderRadius: '4px',
-                            marginBottom: '4px'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <strong style={{ color: 'var(--text)' }}>{notif.agentName}</strong>
-                              <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
-                                {new Date(notif.timestamp).toLocaleTimeString()}
-                              </span>
+                          <div
+                            key={i}
+                            className={`org-notif-item org-notif-item--${notif.level || 'info'}`}
+                          >
+                            <div className="org-notif-item-header">
+                              <strong>{notif.agentName}</strong>
+                              <span>{new Date(notif.timestamp).toLocaleTimeString()}</span>
                             </div>
-                            <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>{notif.message}</div>
+                            <div className="org-notif-item-body">{notif.message}</div>
                           </div>
                         ))
                       )}
@@ -189,24 +171,28 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
                   </div>
                 )}
               </div>
+
               <button
-                className={`btn-sm ${activeOrg.paused ? 'btn-success' : 'btn-warning'}`}
+                className={`org-action-btn ${activeOrg.paused ? 'org-action-btn--success' : 'org-action-btn--warning'}`}
                 onClick={() => updateOrg(activeOrg.id, { paused: !activeOrg.paused })}
               >
                 {activeOrg.paused ? '▶ Resume Org' : '⏸ Pause Org'}
               </button>
-              <button 
-                className="btn-sm" 
-                onClick={() => setShowEditOrg(true)}
-              >
+              <button className="org-action-btn" onClick={() => setShowEditOrg(true)}>
                 ✏️ Edit Org
               </button>
-              <button className="btn-sm btn-danger" onClick={() => {
-                if (confirm(`Delete ${activeOrg.name}? This cannot be undone.`)) deleteOrg(activeOrg.id);
-              }}>🗑 Delete</button>
+              <button
+                className="org-action-btn org-action-btn--danger"
+                onClick={() => {
+                  if (confirm(`Delete ${activeOrg.name}? This cannot be undone.`)) deleteOrg(activeOrg.id);
+                }}
+              >
+                🗑 Delete
+              </button>
             </div>
           </div>
 
+          {/* Subtabs */}
           <div className="org-subtabs">
             {(['agents', 'tickets', 'board', 'workspace', 'proposals', 'activity', 'memory', 'settings'] as OrgSubTab[]).map(tab => (
               <button
@@ -226,14 +212,16 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
             ))}
           </div>
 
+          {/* Tab Content */}
           <div className="org-tab-content">
             {subTab === 'agents' && (
               <div className="agents-grid">
-                {activeOrg.agents.map(agent => (
+                {activeOrg.agents.map((agent, idx) => (
                   <AgentCard
                     key={agent.id}
                     agent={agent}
                     allAgents={activeOrg.agents}
+                    index={idx}
                     isRunning={isAgentRunning(activeOrg.id, agent.id)}
                     onTrigger={() => triggerAgent(activeOrg.id, agent.id)}
                     onChat={() => handleOpenChat(agent.id, agent.name, agent.role)}
@@ -313,6 +301,34 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
               <OrgProtectionSettings org={activeOrg} socket={socket} />
             )}
           </div>
+
+          {/* Minimized Chat Tabs */}
+          {minimizedChats.length > 0 && (
+            <div className="minimized-chats-bar">
+              {minimizedChats.map(chat => (
+                <button
+                  key={chat.chatId}
+                  className="minimized-chat-tab"
+                  onClick={() => setOpenChatId(chat.chatId)}
+                >
+                  <MessageSquare size={14} />
+                  <span>{chat.agentName}</span>
+                  <span className="minimized-chat-count">
+                    {chat.messages.length}
+                  </span>
+                  <button
+                    className="minimized-chat-close"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeChat(chat.chatId);
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -326,6 +342,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
           isWaiting={chats[openChatId].isWaiting}
           onSend={(text, image) => sendMessage(openChatId, text, image)}
           onAbort={(chatId) => abortMessage(chatId)}
+          onMinimize={() => minimizeChat(openChatId)}
           onClose={() => closeChat(openChatId)}
         />
       )}

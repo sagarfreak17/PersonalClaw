@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Camera, Loader2, X } from 'lucide-react';
+import { Camera, Loader2, X, Minus, Trash2 } from 'lucide-react';
 import type { AgentChatMessage } from '../types/org';
 import { useScreenshot } from '../hooks/useScreenshot';
 
@@ -13,10 +13,11 @@ interface AgentChatPaneProps {
   isWaiting: boolean;
   onSend: (text: string, image?: string) => void;
   onAbort: (chatId: string) => void;
+  onMinimize: () => void;
   onClose: () => void;
 }
 
-export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaiting, onSend, onAbort, onClose }: AgentChatPaneProps) {
+export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaiting, onSend, onAbort, onMinimize, onClose }: AgentChatPaneProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const { pendingScreenshot, isCapturing, captureScreenshot, clearScreenshot } = useScreenshot();
@@ -36,11 +37,29 @@ export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaitin
     <div className="agent-chat-pane">
       <div className="agent-chat-header">
         <div className="agent-chat-avatar">{agentName.charAt(0)}</div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div className="agent-chat-name">{agentName}</div>
           <div className="agent-chat-role">{agentRole}</div>
         </div>
-        <button className="agent-chat-close" onClick={onClose}>×</button>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            className="agent-chat-header-btn"
+            onClick={onMinimize}
+            title="Minimize chat"
+          >
+            <Minus size={16} />
+          </button>
+          <button
+            className="agent-chat-header-btn agent-chat-header-btn--danger"
+            onClick={() => {
+              if (messages.length > 0 && !confirm('Close chat and lose history?')) return;
+              onClose();
+            }}
+            title="Close and delete chat"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
       <div className="agent-chat-messages">
         <div className="agent-chat-notice">

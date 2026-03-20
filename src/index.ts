@@ -20,7 +20,7 @@ import { agentRegistry } from './core/agent-registry.js';
 import { skillLock } from './core/skill-lock.js';
 // FIX-3: telegramBrain imported from neutral file, not declared here
 import { telegramBrain } from './core/telegram-brain.js';
-import { orgManager } from './core/org-manager.js';
+import { orgManager, type ProtectionMode } from './core/org-manager.js';
 import { orgHeartbeat } from './core/org-heartbeat.js';
 import { orgTaskBoard } from './core/org-task-board.js';
 import { runOrgAgent, isAgentRunning, closeChatSession, abortChatSession, getAllOrgConversationIds, getRunningAgentsSet } from './core/org-agent-runner.js';
@@ -464,7 +464,7 @@ io.on('connection', (socket) => {
     socket.emit('org:list', orgManager.list());
   });
 
-  socket.on('org:create', (params: { name: string; mission: string; rootDir: string }) => {
+  socket.on('org:create', (params: { name: string; mission: string; rootDir: string; protectionMode?: ProtectionMode; manualPaths?: string[] }) => {
     try {
       const org = orgManager.create(params);
       io.emit('org:created', org);

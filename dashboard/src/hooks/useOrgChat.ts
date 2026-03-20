@@ -61,6 +61,12 @@ export function useOrgChat(socket: Socket) {
   }, [socket]);
 
   const openChat = useCallback((orgId: string, agentId: string, agentName: string, agentRole: string) => {
+    // Check if there's an existing chat with this agent
+    const existingEntry = Object.entries(chats).find(([, c]) => c.agentId === agentId && c.orgId === orgId);
+    if (existingEntry) {
+      setOpenChatId(existingEntry[0]);
+      return existingEntry[0];
+    }
     // Each chat session gets a unique ID — FIX-I: server uses this to persist Brain
     const chatId = `orgchat_${agentId}_${Date.now()}`;
     setChats(prev => ({
@@ -69,7 +75,11 @@ export function useOrgChat(socket: Socket) {
     }));
     setOpenChatId(chatId);
     return chatId;
-  }, []);
+  }, [chats]);
+
+  const minimizeChat = useCallback((chatId: string) => {
+    if (openChatId === chatId) setOpenChatId(null);
+  }, [openChatId]);
 
   const closeChat = useCallback((chatId: string) => {
     const chat = chats[chatId];
@@ -131,6 +141,6 @@ export function useOrgChat(socket: Socket) {
 
   return {
     chats, openChatId, setOpenChatId,
-    openChat, closeChat, sendMessage, abortMessage, readMemory,
+    openChat, closeChat, minimizeChat, sendMessage, abortMessage, readMemory,
   };
 }

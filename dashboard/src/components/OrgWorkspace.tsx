@@ -31,7 +31,7 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
   } = useOrgs(socket);
 
   const {
-    chats, openChatId, openChat, closeChat, sendMessage, readMemory,
+    chats, openChatId, openChat, closeChat, sendMessage, abortMessage, readMemory,
   } = useOrgChat(socket);
 
   const [subTab, setSubTab] = useState<OrgSubTab>('agents');
@@ -324,7 +324,8 @@ export function OrgWorkspace({ socket }: OrgWorkspaceProps) {
           agentRole={chats[openChatId].agentRole}
           messages={chats[openChatId].messages}
           isWaiting={chats[openChatId].isWaiting}
-          onSend={(text) => sendMessage(openChatId, text)}
+          onSend={(text, image) => sendMessage(openChatId, text, image)}
+          onAbort={(chatId) => abortMessage(chatId)}
           onClose={() => closeChat(openChatId)}
         />
       )}

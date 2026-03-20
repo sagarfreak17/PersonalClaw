@@ -50,7 +50,8 @@ PersonalClaw/
 │   │   │   ├── useAgents.ts
 │   │   │   ├── useConversations.ts
 │   │   │   ├── useOrgChat.ts
-│   │   │   └── useOrgs.ts
+│   │   │   ├── useOrgs.ts
+│   │   │   └── useScreenshot.ts           # Reusable screen capture hook (getDisplayMedia)
 │   │   ├── types
 │   │   │   ├── conversation.ts
 │   │   │   └── org.ts

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Camera, Loader2, X } from 'lucide-react';
 import type { AgentChatMessage } from '../types/org';
+import { useScreenshot } from '../hooks/useScreenshot';
 
 interface AgentChatPaneProps {
   chatId: string;
@@ -9,22 +11,25 @@ interface AgentChatPaneProps {
   agentRole: string;
   messages: AgentChatMessage[];
   isWaiting: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, image?: string) => void;
+  onAbort: (chatId: string) => void;
   onClose: () => void;
 }
 
-export function AgentChatPane({ agentName, agentRole, messages, isWaiting, onSend, onClose }: AgentChatPaneProps) {
+export function AgentChatPane({ chatId, agentName, agentRole, messages, isWaiting, onSend, onAbort, onClose }: AgentChatPaneProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { pendingScreenshot, isCapturing, captureScreenshot, clearScreenshot } = useScreenshot();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = () => {
-    if (!input.trim() || isWaiting) return;
-    onSend(input.trim());
+    if ((!input.trim() && !pendingScreenshot) || isWaiting) return;
+    onSend(input.trim(), pendingScreenshot || undefined);
     setInput('');
+    clearScreenshot();
   };
 
   return (
@@ -44,6 +49,9 @@ export function AgentChatPane({ agentName, agentRole, messages, isWaiting, onSen
         {messages.map(msg => (
           <div key={msg.id} className={`agent-chat-message ${msg.role}`}>
             <div className="message-text">
+              {msg.image && (
+                <img src={msg.image} alt="Screenshot" className="message-image" />
+              )}
               {msg.role === 'assistant' ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
               ) : (
@@ -61,14 +69,44 @@ export function AgentChatPane({ agentName, agentRole, messages, isWaiting, onSen
         <div ref={bottomRef} />
       </div>
       <div className="agent-chat-input">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder={`Message ${agentName}…`}
-          disabled={isWaiting}
-        />
-        <button onClick={handleSend} disabled={!input.trim() || isWaiting}>↑</button>
+        {pendingScreenshot && (
+          <div className="screenshot-preview">
+            <img src={pendingScreenshot} alt="Pending screenshot" />
+            <button className="screenshot-preview-remove" onClick={clearScreenshot}>
+              <X size={12} />
+            </button>
+            <span className="screenshot-preview-label">Screenshot attached</span>
+          </div>
+        )}
+        <div className="agent-chat-input-row">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder={`Message ${agentName}…`}
+            disabled={isWaiting}
+          />
+          <button
+            className="screenshot-btn"
+            onClick={captureScreenshot}
+            disabled={isCapturing || isWaiting}
+            title="Share Screenshot"
+          >
+            {isCapturing ? <Loader2 size={16} className="spin" /> : <Camera size={16} />}
+          </button>
+          {isWaiting ? (
+            <button
+              className="stop-btn"
+              onClick={() => onAbort(chatId)}
+              title="Stop all activity in this chat"
+              style={{ fontSize: '1.2rem', padding: '0 12px' }}
+            >
+              &#9632;
+            </button>
+          ) : (
+            <button onClick={handleSend} disabled={!input.trim() && !pendingScreenshot}>↑</button>
+          )}
+        </div>
       </div>
     </div>
   );

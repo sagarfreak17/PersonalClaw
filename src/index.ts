@@ -23,7 +23,7 @@ import { telegramBrain } from './core/telegram-brain.js';
 import { orgManager } from './core/org-manager.js';
 import { orgHeartbeat } from './core/org-heartbeat.js';
 import { orgTaskBoard } from './core/org-task-board.js';
-import { runOrgAgent, isAgentRunning, closeChatSession, getAllOrgConversationIds, getRunningAgentsSet } from './core/org-agent-runner.js';
+import { runOrgAgent, isAgentRunning, closeChatSession, abortChatSession, getAllOrgConversationIds, getRunningAgentsSet } from './core/org-agent-runner.js';
 import { approveProposal, rejectProposal, loadProposals, resetStaleInProgressTickets, getProposalContent } from './core/org-file-guard.js';
 import { storeNotification, getNotifications, setTelegramSender, sendDailyDigest } from './core/org-notification-store.js';
 import cron from 'node-cron';
@@ -530,9 +530,19 @@ io.on('connection', (socket) => {
 
   // ── Direct agent chat (FIX-I: persistent Brain per chatId) ──
   socket.on('org:agent:message', async (params: {
-    orgId: string; agentId: string; chatId: string; text: string;
+    orgId: string; agentId: string; chatId: string; text: string; image?: string;
   }) => {
-    const { orgId, agentId, chatId, text } = params;
+    const { orgId, agentId, chatId, image } = params;
+    let text = params.text;
+    if (image) {
+      const base64Data = image.replace(/^data:image\/png;base64,/, '');
+      const screenshotsDir = path.join(process.cwd(), 'screenshots');
+      if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
+      const filename = `orgchat_${Date.now()}.png`;
+      const filePath = path.join(screenshotsDir, filename);
+      fs.writeFileSync(filePath, base64Data, 'base64');
+      text = `[DASHBOARD_IMAGE_UPLOAD] User attached a screenshot saved to "${filePath}".\n\nUser Message: ${text}`;
+    }
     try {
       socket.emit('org:agent:thinking', { chatId, agentId });
       const result = await runOrgAgent(orgId, agentId, 'chat', text, chatId);
@@ -547,6 +557,19 @@ io.on('connection', (socket) => {
   // FIX-I: Clean up persistent chat Brain when pane is closed
   socket.on('org:agent:chat:close', (params: { chatId: string }) => {
     closeChatSession(params.chatId);
+  });
+
+  socket.on('org:agent:abort', (params: { chatId: string }) => {
+    try {
+      abortChatSession(params.chatId);
+      socket.emit('org:agent:response', {
+        chatId: params.chatId,
+        text: '⬛ Stopped. What\'s next?',
+        isAborted: true,
+      });
+    } catch (err: any) {
+      socket.emit('org:error', { message: err.message });
+    }
   });
 
   // ── Ticket management ──

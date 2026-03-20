@@ -431,6 +431,15 @@ export function closeChatSession(chatId: string): void {
   console.log(`[OrgAgentRunner] Chat session closed: ${chatId}`);
 }
 
+export function abortChatSession(chatId: string): void {
+  const brain = chatBrains.get(chatId);
+  if (brain) {
+    brain.abort();
+    setTimeout(() => brain.resetAbort(), 200);
+    console.log(`[OrgAgentRunner] Chat session aborted: ${chatId}`);
+  }
+}
+
 export function isAgentRunning(orgId: string, agentId: string): boolean {
   return runningAgents.has(`${orgId}:${agentId}`);
 }

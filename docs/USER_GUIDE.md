@@ -85,7 +85,7 @@ The **Settings** tab lets you control which files agents must submit proposals t
 ### 1. The Command Center (Web Dashboard)
 - **URL**: [http://localhost:5173](http://localhost:5173)
 - **Features**: Real-time system telemetry (CPU/RAM), glassmorphic dark/light mode, and full markdown chat experience.
-- **📸 Dashboard Screenshot**: Click the **Camera icon** next to the chat box to capture any window or your entire screen. PersonalClaw will process it immediately!
+- **📸 Dashboard Screenshot**: Click the **Camera icon** next to the chat box (available in both the main chat and direct agent chat) to capture any window or your entire screen. A preview appears above the input — type an optional message and hit send. PersonalClaw will process it immediately!
 - **Tip**: Use `Shift + Enter` for line breaks and `Enter` to send.
 
 ### 2. Telegram Bot (Mobile Control)

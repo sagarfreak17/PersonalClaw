@@ -85,7 +85,7 @@ export function useOrgChat(socket: Socket) {
     if (openChatId === chatId) setOpenChatId(null);
   }, [chats, openChatId, socket]);
 
-  const sendMessage = useCallback((chatId: string, text: string) => {
+  const sendMessage = useCallback((chatId: string, text: string, image?: string) => {
     const chat = chats[chatId];
     if (!chat) return;
     setChats(prev => ({
@@ -94,13 +94,18 @@ export function useOrgChat(socket: Socket) {
         ...prev[chatId],
         messages: [
           ...prev[chatId].messages,
-          { id: `msg_${Date.now()}`, role: 'user', text, timestamp: new Date().toISOString() },
+          {
+            id: `msg_${Date.now()}`, role: 'user',
+            text: text || (image ? '[Sent an image for analysis]' : ''),
+            timestamp: new Date().toISOString(), image,
+          },
         ],
         isWaiting: true,
       },
     }));
     socket.emit('org:agent:message', {
-      orgId: chat.orgId, agentId: chat.agentId, chatId, text,
+      orgId: chat.orgId, agentId: chat.agentId, chatId,
+      text: text || 'Analyze this image.', image,
     });
   }, [socket, chats]);
 
@@ -120,8 +125,12 @@ export function useOrgChat(socket: Socket) {
     });
   }, [socket]);
 
+  const abortMessage = useCallback((chatId: string) => {
+    socket.emit('org:agent:abort', { chatId });
+  }, [socket]);
+
   return {
     chats, openChatId, setOpenChatId,
-    openChat, closeChat, sendMessage, readMemory,
+    openChat, closeChat, sendMessage, abortMessage, readMemory,
   };
 }

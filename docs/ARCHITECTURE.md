@@ -33,7 +33,7 @@ PersonalClaw uses a multi-layered architecture. The **ConversationManager** mana
 |---|---|---|
 | `org:list` | Bidirectional | Sync all organisations and agents |
 | `org:agent:trigger` | Client → Server | Manually trigger an agent run |
-| `org:agent:message` | Client → Server | Send message to a dedicated agent Brain |
+| `org:agent:message` | Client → Server | Send message to a dedicated agent Brain (supports optional `image` field) |
 | `org:agent:response` | Server → Client | Response from a dedicated agent Brain |
 | `org:agent:chat:close` | Client → Server | Close persistent chat Brain and free memory |
 | `org:tickets:list` | Bidirectional | Sync ticket board for an org |

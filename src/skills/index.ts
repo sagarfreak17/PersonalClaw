@@ -15,6 +15,7 @@ import { pdfSkill } from './pdf.js';
 import { imagegenSkill } from './imagegen.js';
 import { agentSpawnSkill } from './agent-spawn.js';
 import { orgManagementSkill } from './org-management-skill.js';
+import { linkedinSkill } from './linkedin.js';
 import { Skill, SkillMeta } from '../types/skill.js';
 
 export const skills: Skill[] = [
@@ -34,6 +35,7 @@ export const skills: Skill[] = [
   imagegenSkill,
   agentSpawnSkill,
   orgManagementSkill,
+  linkedinSkill,
 ];
 
 export { initScheduler };

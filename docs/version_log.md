@@ -2,6 +2,32 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.2.1] - 2026-03-20
+
+### Screenshot-to-Chat Restored
+
+#### Share Screenshot Button
+- Restored the screenshot capture feature that was removed during the v11 multi-pane refactor
+- Camera button now appears in both **ConversationPane** (main chat) and **AgentChatPane** (org agent direct chat)
+- Uses browser `getDisplayMedia` API — pick any window or full screen
+- Screenshot preview appears above the input area with a remove button before sending
+- Images rendered inline in the message history for both user and assistant messages
+- Server saves screenshots as PNGs to `screenshots/` directory and injects the file path into the prompt
+- Org agent chat handler (`org:agent:message`) now supports image payloads, matching the existing main chat handler
+- New reusable `useScreenshot` hook extracts capture logic from the old monolithic App.tsx
+- Light theme styles included for all new screenshot UI elements
+
+#### Files Changed
+- **New**: `dashboard/src/hooks/useScreenshot.ts` — reusable screenshot capture hook
+- **Updated**: `ConversationPane.tsx`, `AgentChatPane.tsx` — camera button, preview, inline image rendering
+- **Updated**: `ChatWorkspace.tsx`, `OrgWorkspace.tsx` — pass image through send callbacks
+- **Updated**: `useConversations.ts`, `useOrgChat.ts` — `sendMessage` accepts optional image
+- **Updated**: `types/conversation.ts`, `types/org.ts` — `image?: string` on message types
+- **Updated**: `src/index.ts` — org agent message handler saves images server-side
+- **Updated**: `index.css` — screenshot preview, camera button, message image styles
+
+---
+
 ## [12.2.0] - 2026-03-19
 
 ### Dashboard Overhaul & Workspace System

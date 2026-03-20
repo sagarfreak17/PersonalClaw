@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Camera, Loader2, X } from 'lucide-react';
 import type { Message, WorkerAgentInfo, WorkerLog } from '../types/conversation';
 import type { ToolFeedItem } from '../types/org';
 import { WorkerCard } from './WorkerCard';
+import { useScreenshot } from '../hooks/useScreenshot';
 
 interface ConversationPaneProps {
   conversationId: string;
@@ -17,7 +19,7 @@ interface ConversationPaneProps {
   isSuperUser: boolean;
   toolFeedItems?: ToolFeedItem[];
   showCloseButton: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, image?: string) => void;
   onClose: () => void;
   onAbort: () => void;
   onToggleAgentPanel: () => void;
@@ -29,6 +31,7 @@ export function ConversationPane(props: ConversationPaneProps) {
   const [selectedLogAgentId, setSelectedLogAgentId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { pendingScreenshot, isCapturing, captureScreenshot, clearScreenshot } = useScreenshot();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,9 +47,10 @@ export function ConversationPane(props: ConversationPaneProps) {
   };
 
   const handleSend = () => {
-    if (!input.trim()) return;
-    props.onSend(input.trim());
+    if (!input.trim() && !pendingScreenshot) return;
+    props.onSend(input.trim(), pendingScreenshot || undefined);
     setInput('');
+    clearScreenshot();
     if (textareaRef.current) textareaRef.current.style.height = '44px';
   };
 
@@ -85,6 +89,9 @@ export function ConversationPane(props: ConversationPaneProps) {
                 {msg.role === 'assistant' ? '🤖' : '👤'}
               </div>
               <div className="message-text">
+                {msg.image && (
+                  <img src={msg.image} alt="Screenshot" className="message-image" />
+                )}
                 {msg.role === 'assistant' ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                 ) : msg.text}
@@ -143,30 +150,49 @@ export function ConversationPane(props: ConversationPaneProps) {
       </div>
 
       <div className="pane-input-area">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={`Message ${props.label}\u2026`}
-          rows={1}
-          disabled={props.isWaiting}
-        />
-        {props.isWaiting ? (
-          <button
-            className="stop-btn"
-            onClick={props.onAbort}
-            title="Stop all activity in this chat"
-          >
-            &#9632;
-          </button>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className="send-btn"
-          >&uarr;</button>
+        {pendingScreenshot && (
+          <div className="screenshot-preview">
+            <img src={pendingScreenshot} alt="Pending screenshot" />
+            <button className="screenshot-preview-remove" onClick={clearScreenshot}>
+              <X size={12} />
+            </button>
+            <span className="screenshot-preview-label">Screenshot attached</span>
+          </div>
         )}
+        <div className="pane-input-row">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={`Message ${props.label}\u2026`}
+            rows={1}
+            disabled={props.isWaiting}
+          />
+          <button
+            className="screenshot-btn"
+            onClick={captureScreenshot}
+            disabled={isCapturing || props.isWaiting}
+            title="Share Screenshot"
+          >
+            {isCapturing ? <Loader2 size={16} className="spin" /> : <Camera size={16} />}
+          </button>
+          {props.isWaiting ? (
+            <button
+              className="stop-btn"
+              onClick={props.onAbort}
+              title="Stop all activity in this chat"
+            >
+              &#9632;
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() && !pendingScreenshot}
+              className="send-btn"
+            >&uarr;</button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ export interface Message {
   text: string;
   timestamp: string;
   conversationId: string;
+  image?: string;
 }
 
 export type WorkerStatus =

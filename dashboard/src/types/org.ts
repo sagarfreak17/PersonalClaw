@@ -82,6 +82,7 @@ export interface AgentChatMessage {
   role: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  image?: string;
 }
 
 export interface OrgNotification {

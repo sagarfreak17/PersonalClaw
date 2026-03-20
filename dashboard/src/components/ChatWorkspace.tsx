@@ -77,7 +77,7 @@ export function ChatWorkspace({ socket, isSuperUser }: ChatWorkspaceProps) {
                   showCloseButton={conversations.length > 1}
                   socket={socket}
                   toolFeedItems={isSuperUser ? (toolFeeds[convo.id] ?? []) : []}
-                  onSend={(text: string) => sendMessage(convo.id, text)}
+                  onSend={(text: string, image?: string) => sendMessage(convo.id, text, image)}
                   onClose={() => closeConversation(convo.id)}
                   onAbort={() => abortConversation(convo.id)}
                 />

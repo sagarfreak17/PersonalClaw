@@ -125,16 +125,17 @@ export function useConversations(socket: Socket) {
   const abortConversation = useCallback((id: string) =>
     socket.emit('conversation:abort', { conversationId: id }), [socket]);
 
-  const sendMessage = useCallback((conversationId: string, text: string) => {
+  const sendMessage = useCallback((conversationId: string, text: string, image?: string) => {
     setMessages(prev => ({
       ...prev,
       [conversationId]: [...(prev[conversationId] ?? []), {
-        id: `msg_${Date.now()}`, role: 'user', text,
-        timestamp: new Date().toISOString(), conversationId,
+        id: `msg_${Date.now()}`, role: 'user',
+        text: text || (image ? '[Sent an image for analysis]' : ''),
+        timestamp: new Date().toISOString(), conversationId, image,
       }],
     }));
     setIsWaiting(prev => ({ ...prev, [conversationId]: true }));
-    socket.emit('message', { text, conversationId });
+    socket.emit('message', { text: text || 'Analyze this image.', conversationId, image });
   }, [socket]);
 
   return {

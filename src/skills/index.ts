@@ -17,6 +17,7 @@ import { agentSpawnSkill } from './agent-spawn.js';
 import { orgManagementSkill } from './org-management-skill.js';
 import { linkedinSkill } from './linkedin.js';
 import { twitterSkill } from './twitter.js';
+import { todosSkill } from './todos.js';
 import { Skill, SkillMeta } from '../types/skill.js';
 
 export const skills: Skill[] = [
@@ -38,6 +39,7 @@ export const skills: Skill[] = [
   orgManagementSkill,
   linkedinSkill,
   twitterSkill,
+  todosSkill,
 ];
 
 export { initScheduler };

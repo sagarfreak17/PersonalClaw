@@ -2,6 +2,156 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.7.2] - 2026-03-21
+
+### Todos — Critical Fixes & Recurring Template UI
+
+#### Fixed: Add Todo / All REST Calls Silently Failing
+- **Root cause**: No Vite proxy configured — all `fetch('/api/...')` calls from the dashboard (port 5173) went to Vite itself, not the backend (port 3000). Every REST call returned an HTML page, response was not `.ok`, and nothing happened with no visible error.
+- **Fix**: Added Vite dev-server proxy in `dashboard/vite.config.ts`:
+  ```js
+  server: { proxy: { '/api': 'http://localhost:3000' } }
+  ```
+- **Also fixed**: `CreateOrgModal` fetch calls (`/api/check-git`, `/api/browse-folder`) had the same silent failure — now resolved by the same proxy.
+- **Error visibility**: `handleCreate()` now catches network-level failures and shows `"Network error: ..."` inline. Server-level errors (400/500) also surface as `"Server error (400)"` text rather than silently doing nothing.
+
+#### Fixed: Stats Bar Counts Not Matching Displayed List
+- **Root cause**: `TodoManager.getStats()` counted all visible todos including subtasks, but the dashboard list only shows top-level todos. A parent with 3 high-priority subtasks showed "4 HIGH PRIORITY" but only 1 card was visible.
+- **Fix**: `getStats()` now filters to `!t.parentId` (top-level only) before all calculations — Open, Done, Due Today, Overdue, High Priority, and Completed This Week counts all match exactly what the list shows.
+
+#### Fixed: `loadActivityFromDisk` Temporal Dead Zone Error
+- **Root cause**: `loadActivityFromDisk()` was called at line 94 in `src/index.ts` but `ACTIVITY_FILE` (a `const`) wasn't declared until line 109. JavaScript `const` is in the temporal dead zone before its declaration — accessing it throws `ReferenceError: Cannot access 'ACTIVITY_FILE' before initialization`.
+- **Fix**: Moved `loadActivityFromDisk()` call to immediately after the `ACTIVITY_FILE` and `MAX_ACTIVITY_FILE_ENTRIES` declarations. Error no longer appears on startup.
+
+#### New: Recurring Template Creation UI
+- Added a full create form directly in the "Recurring Templates" section — no longer need to ask the AI to create recurring todos.
+- Clicking `+ New Template` expands an inline form with:
+  - Title input
+  - Frequency selector: **Daily**, **Weekly**, **Monthly**
+  - Priority selector
+  - Day-of-week picker (clickable day buttons, multi-select) — shown for Weekly
+  - Day-of-month number input — shown for Monthly
+- Enter to create or click "Create Template" button. Escape or Cancel to dismiss.
+- Templates appear in the list immediately after creation.
+
+#### Files Changed
+- **Updated**: `dashboard/vite.config.ts` — Vite `/api` proxy to `http://localhost:3000`
+- **Updated**: `dashboard/src/components/TodosTab.tsx` — recurring create form, network/server error display, focus button tooltip
+- **Updated**: `dashboard/src/index.css` — recurring form CSS (header, create form, day picker, submit/cancel buttons), `.add-todo-error` class
+- **Updated**: `src/core/todo-manager.ts` — `getStats()` top-level-only counts
+- **Updated**: `src/index.ts` — moved `loadActivityFromDisk()` after `ACTIVITY_FILE` declaration
+
+---
+
+## [12.7.1] - 2026-03-21
+
+### Todos — Bug Fixes & Enhancements
+
+#### Fixed: "Add Todo" Button Silent Failure
+- **Root cause**: `handleCreate()` returned early on empty title with no user feedback — typing in the notes field instead of the title field produced zero visible response.
+- **Fix**: Title input now triggers a red shake animation + "Title is required" inline error message on empty submit. Focus snaps back to title field automatically.
+- **Placeholder updated**: `"What needs to be done?"` → `"Todo title (required) — e.g. Check TimeZest Appointments"` to make the field purpose unambiguous.
+
+#### Fixed: `(Events as any)` Workaround Removed
+- `todo-manager.ts` was using `(Events as any).TODOS_UPDATED` and `(Events as any).TODOS_RECURRING_FIRED` because the constants were added after the file was written. Now uses `Events.TODOS_UPDATED` and `Events.TODOS_RECURRING_FIRED` directly.
+
+#### Fixed: Hardcoded Color in CSS
+- `.stat-chip.warning` used `#f59e0b` instead of `var(--accent-warning)`. Fixed for theme consistency.
+
+#### Fixed: 13 Missing CSS Classes
+Added all classes that were referenced in `TodosTab.tsx` but absent from `index.css`:
+- Priority left borders: `.todo-item.priority-high/medium/low`, `.focus-item.priority-high/medium/low`
+- Empty states: `.todos-loading`, `.todos-empty`, `.focus-empty`, `.recurring-empty`
+- Buttons: `.add-todo-cancel-btn`, `.recurring-delete-btn`, `.subtask-add-btn`
+- Elements: `.todo-priority-dot`, `.subtask-title.strikethrough`, `.subtask-item.done`
+- Badge colors: `.todo-source-badge` (success), `.todo-tag-badge` (secondary), `.todo-time-badge` (primary)
+
+#### New: Inline Title Editing
+- Double-click any open todo's title to edit it in place — no modal, no form.
+- Enter to save, Escape to cancel, blur to save.
+- New `PUT /api/todos/:id` REST endpoint added to `src/index.ts`.
+- New `.todo-title-edit` CSS class for the inline input.
+
+#### New: Org Agent Runtime Permission Guard
+- Previously, org agents were instructed via description text not to complete or delete user todos. Now enforced at runtime in `src/skills/todos.ts`:
+  - `complete` and `delete` actions called by `meta.isWorker === true` check if the target todo's `createdBy !== 'agent'` and return an error if so.
+  - Prevents any org agent from completing or deleting human-created todos regardless of what the AI decides.
+
+#### Files Changed
+- **Updated**: `dashboard/src/components/TodosTab.tsx` — title validation, inline edit, `onUpdate` prop
+- **Updated**: `dashboard/src/index.css` — 13 missing classes, title error + shake animation, inline edit input
+- **Updated**: `src/core/todo-manager.ts` — removed `(Events as any)` casts
+- **Updated**: `src/index.ts` — new `PUT /api/todos/:id` endpoint
+- **Updated**: `src/skills/todos.ts` — org agent runtime permission guard
+
+---
+
+## [12.7.0] - 2026-03-21
+
+### Task Management System (Todo Manager)
+
+#### New: Todo Manager Core
+- **`TodoManager` class** (`src/core/todo-manager.ts`) — robust task engine with support for:
+  - CRUD operations (create, update, delete, complete, reopen)
+  - Subtask hierarchy (infinitely nestable)
+  - Priority levels (low, medium, high, critical)
+  - Due dates and overdue tracking
+  - Tags and categories
+  - Detailed notes with markdown support
+  - Automated ID generation and JSON persistence to `memory/todos.json`
+- **Recurring Tasks Engine**: Supports daily, weekly (specific days), and monthly recurrence. Automatically spawns new todo instances from templates.
+- **Midnight Cron Job**: A daily background task (`0 0 * * *`) that processes all recurring templates and fires missed ones.
+
+#### New: Todos Dashboard Tab
+- **Task Board UI** (`dashboard/src/components/TodosTab.tsx`) — premium, high-fidelity task management interface:
+  - **Focus Mode**: Dedicated "Today" view with progress tracking.
+  - **Stats Bar**: Real-time overview of open, today, overdue, and high-priority tasks.
+  - **Weekly Completion Chart**: Visualized progress of completed tasks over the last 7 days.
+  - **Filtering**: Quick filters for "Today", "Overdue", "High Priority", and "Done".
+  - **Subtask Management**: Expandable subtasks with quick-add functionality.
+  - **Template Management**: Dedicated section to view and manage recurring task templates.
+- **`useTodos` Hook**: Custom React hook for real-time socket synchronization and task state management.
+- **Frontend Types**: Robust `Todo`, `TodoStats`, and `TodoFilter` interfaces in `dashboard/src/types/todos.ts`.
+
+#### System Integration
+- **New `manage_todos` Skill**: Enables AI agents to create, query, and manage the user's task list via natural language.
+- **Socket.io Integration**: Real-time updates via `todos:refresh` event. Dashboard auto-syncs across all open instances when any task changes.
+- **REST API Overhaul**: 7 new endpoints added to `src/index.ts` for task management (`/api/todos`, `/api/todos/complete`, etc.).
+- **Event Bus Integration**: `TODOS_UPDATED` and `TODOS_RECURRING_FIRED` events dispatched for audit logging and activity feed.
+
+#### Files Changed
+- **New**: `src/core/todo-manager.ts`, `src/skills/todos.ts`, `dashboard/src/components/TodosTab.tsx`, `dashboard/src/hooks/useTodos.ts`, `dashboard/src/types/todos.ts`, `memory/todos.json` (init)
+- **Updated**: `src/index.ts` (API/Socket integration), `src/core/events.ts` (new constants), `src/skills/index.ts` (registry), `dashboard/src/App.tsx` (navigation), `dashboard/src/index.css` (styles)
+
+---
+
+## [12.6.2] - 2026-03-21
+
+### Org Agent Workspace Sandbox & File Naming Overhaul
+
+#### Fixed: Agents Writing Files Outside Workspace
+- **Root cause**: `manage_files` skill accepted any path. When an org agent used a relative path like `ceo/report.md`, it resolved against `process.cwd()` (the project root) instead of the org's workspace directory — creating rogue folders in the project root.
+- **Fix**: The `orgAwareHandleToolCall` interceptor in `org-agent-runner.ts` now sandboxes all `manage_files` write operations to the org's `workspaceDir`. Relative paths resolve against the workspace, and absolute paths outside the workspace are blocked with a clear error message.
+- **System prompt updated**: Replaced the vague "Working in the Org Root Directory" section with explicit **File Operations** rules — agents are told writes are sandboxed, must use relative paths, and will be blocked if they attempt to write outside the workspace.
+
+#### Changed: File Naming Convention
+- **Before**: `ceo-2026-03-19T14-01-12-CEO-Progress-Report.md` (role first, verbose ISO timestamp with time)
+- **After**: `marketing-plan-by-ceo-2026-03-19.md` (document name first, then `-by-{role}-{date}`)
+- Filenames are now slugified and cleaned — no uppercase, no special characters, just clean kebab-case
+- Date is `YYYY-MM-DD` only (no time component clutter)
+- `org_write_report` skill description updated to guide agents toward descriptive document names
+
+#### Fixed: File Attribution for `manage_files` Writes
+- Backend workspace file scanner (`org:workspace:files:all`) now matches both relative and absolute paths from agent activity logs
+- Files created via `manage_files` are now properly attributed to their agent instead of appearing as "Unassigned Files"
+
+#### Files Changed
+- **Updated**: `src/core/org-agent-runner.ts` — workspace sandbox interceptor, updated system prompt, fixed `FileActivityEntry` type to include `'move'` action
+- **Updated**: `src/skills/org-skills.ts` — new naming convention in `org_write_report` (`{name}-by-{role}-{date}`)
+- **Updated**: `src/index.ts` — file attribution lookup matches absolute paths from activity logs
+
+---
+
 ## [12.6.1] - 2026-03-21
 
 ### Telegram Bot — Reliability, Formatting & UX Fixes

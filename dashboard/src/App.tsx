@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ChatInput from './components/ChatInput';
 import { ChatWorkspace } from './components/ChatWorkspace';
 import { OrgWorkspace } from './components/OrgWorkspace';
+import { TodosTab } from './components/TodosTab';
 
 import { io, Socket } from 'socket.io-client';
 import {
@@ -32,6 +33,7 @@ import {
   Sparkles,
   ArrowUp,
   Building2,
+  CheckSquare,
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -61,7 +63,7 @@ interface SkillInfo {
   description: string;
 }
 
-type TabType = 'command' | 'metrics' | 'activity' | 'skills' | 'orgs';
+type TabType = 'command' | 'metrics' | 'activity' | 'skills' | 'orgs' | 'todos';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -343,6 +345,10 @@ const App: React.FC = () => {
               <Building2 size={18} />
               {!sidebarCollapsed && <span>Orgs</span>}
             </li>
+            <li className={`nav-item ${activeTab === 'todos' ? 'active' : ''}`} onClick={() => setActiveTab('todos')} title="Task Management">
+              <CheckSquare size={18} />
+              {!sidebarCollapsed && <span>Todos</span>}
+            </li>
           </ul>
         </nav>
 
@@ -574,6 +580,19 @@ const App: React.FC = () => {
                 style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
               >
                 <OrgWorkspace socket={socket} />
+              </motion.div>
+            )}
+
+            {/* ── Todos ── */}
+            {activeTab === 'todos' && socket && (
+              <motion.div
+                key="todos"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+              >
+                <TodosTab socket={socket} />
               </motion.div>
             )}
           </AnimatePresence>

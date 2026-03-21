@@ -6,7 +6,7 @@ For the full technical deep-dive (every interface, every event, every endpoint),
 
 ---
 
-## Project Structure (v12.6.1)
+## Project Structure (v12.7.2)
 
 ```
 PersonalClaw/
@@ -24,6 +24,7 @@ PersonalClaw/
 │   │   ├── org-task-board.ts       # Kanban ticket system per org (write-lock protected)
 │   │   ├── org-file-guard.ts       # File protection + code proposal workflow
 │   │   ├── org-notification-store.ts # Persistent notifications + Telegram (rate-limited)
+│   │   ├── todo-manager.ts         # Todo CRUD, recurring engine, stats, filtered queries
 │   │   ├── skill-lock.ts           # Concurrent resource protection (exclusive + read-write locks)
 │   │   ├── events.ts               # EventBus — 45+ typed events
 │   │   ├── browser.ts              # BrowserManager — Playwright + native Chrome CDP
@@ -35,7 +36,7 @@ PersonalClaw/
 │   │   └── telegram-brain.ts       # Isolated Telegram Brain instance
 │   ├── interfaces/
 │   │   └── telegram.ts             # Telegraf bot — polling, retry, markdown formatting, typing indicator
-│   └── skills/                     # 19 registered skills
+│   └── skills/                     # 20 registered skills
 │       ├── index.ts                # Skill registry, getToolDefinitions(), handleToolCall()
 │       ├── shell.ts                # execute_powershell — PowerShell commands
 │       ├── python.ts               # run_python_script — dynamic Python execution
@@ -55,10 +56,12 @@ PersonalClaw/
 │       ├── org-skills.ts           # 13 org-agent-only skills (tickets, memory, delegate, proposals)
 │       ├── scheduler.ts            # manage_scheduler — cron job management
 │       ├── linkedin.ts             # linkedin_post — pyautogui replay automation
-│       └── twitter.ts              # twitter_post — relay + vision pre-flight + pyautogui
+│       ├── twitter.ts              # twitter_post — relay + vision pre-flight + pyautogui
+│       └── todos.ts                # manage_todos — personal todo list (12 actions, read-write lock)
 ├── dashboard/                      # React 19 + Vite frontend (port 5173)
+│   ├── vite.config.ts              # Vite config — proxies /api → http://localhost:3000 (required for REST calls)
 │   └── src/
-│       ├── App.tsx                 # Main dashboard — sidebar, 5 tabs, metrics, socket
+│       ├── App.tsx                 # Main dashboard — sidebar, 6 tabs, metrics, socket
 │       ├── index.css               # Design system — light theme, indigo accent (#4338ca)
 │       ├── components/
 │       │   ├── ChatWorkspace.tsx        # Multi-pane resizable chat (react-resizable-panels)
@@ -72,16 +75,19 @@ PersonalClaw/
 │       │   ├── WorkspaceTab.tsx         # IDE-style file explorer + editor + comments
 │       │   ├── ProposalBoard.tsx        # Code proposal diff view + approve/reject
 │       │   ├── OrgProtectionSettings.tsx # Protection mode config + file list
+│       │   ├── TodosTab.tsx             # Todos UI — stats bar, filters, add form, inline edit, focus mode, recurring create form
 │       │   └── WorkerCard.tsx           # Sub-agent status card
 │       ├── hooks/
 │       │   ├── useConversations.ts      # Chat state + socket handlers
 │       │   ├── useOrgs.ts              # Org/agent/ticket/proposal state
 │       │   ├── useOrgChat.ts           # Agent direct messaging (minimize/close)
 │       │   ├── useAgents.ts            # Sub-agent worker tracking
-│       │   └── useScreenshot.ts        # DisplayMedia screen capture
+│       │   ├── useScreenshot.ts        # DisplayMedia screen capture
+│       │   └── useTodos.ts             # Todos state, socket sync, filter logic (useMemo for derived data)
 │       └── types/
 │           ├── conversation.ts          # Message, WorkerAgentInfo
-│           └── org.ts                   # Org, OrgAgent, Ticket, Proposal, Blocker
+│           ├── org.ts                   # Org, OrgAgent, Ticket, Proposal, Blocker
+│           └── todos.ts                 # Todo, TodoStats, TodoFilter interfaces
 ├── extension/                      # Chrome MV3 relay extension
 │   ├── manifest.json               # Permissions: tabs, activeTab, scripting
 │   ├── background.js               # WebSocket to ws://127.0.0.1:3000/relay
@@ -105,6 +111,7 @@ PersonalClaw/
 │   ├── long_term_knowledge.json    # Learned user preferences
 │   ├── self_learned.json           # Auto-learned patterns
 │   ├── scheduled_jobs.json         # Active cron jobs
+│   ├── todos.json                  # All todos + recurring templates (atomic write)
 │   └── audit/                      # Daily JSONL audit logs
 ├── scripts/                        # Automation scripts
 │   ├── xpost.py                    # Twitter posting (pyautogui replay)
@@ -136,11 +143,11 @@ Dashboard (:5173) ←──Socket.io──→ Express Server (:3000)
                     └────── Brain ─────┘
                            (Gemini)
                               │
-                        19 Skills + 13 Org Skills
+                        20 Skills + 13 Org Skills
 
 Telegram (Telegraf) ──polling──→ telegramBrain (isolated Brain)
                                   │
-                             19 Skills (NO org skills)
+                             20 Skills (NO org skills)
                              Separate history, no persistence
 ```
 
@@ -192,6 +199,7 @@ interface SkillMeta {
 | `clipboard` | Exclusive | 5s | clipboard |
 | `memory` | Read-Write | 5s | memory, org memory skills |
 | `scheduler` | Read-Write | 5s | scheduler |
+| `todos` | Read-Write | 5s | todos |
 | `files:{path}` | Read-Write | 10s | files, pdf, task board |
 
 Pattern: `const release = await skillLock.acquireExclusive(key, holder); try { ... } finally { release(); }`
@@ -248,6 +256,8 @@ export const skills: Skill[] = [ ..., mySkill ];
 4. Style using class names in `dashboard/src/index.css` (light theme, indigo accent `#4338ca`)
 
 **State management:** Custom hooks (`useOrgs`, `useConversations`, etc.) — no Redux, no context providers.
+
+**API calls from the dashboard:** Always use relative paths like `fetch('/api/todos')` — the Vite dev proxy (`vite.config.ts`) forwards them to `http://localhost:3000`. Socket.io connects directly to port 3000 and is unaffected.
 
 ---
 

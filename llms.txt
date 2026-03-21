@@ -1,0 +1,35 @@
+# PersonalClaw — Autonomous AI Company Orchestration
+
+The next-generation Windows AI agent. Local. Private. Unstoppable.
+
+## Overview
+PersonalClaw is a locally-hosted AI platform that allows users to deploy autonomous, full-stack digital workforces on Windows. It combines Google Gemini with deep system access, a Kanban-based ticket system, and persistent multi-agent memory.
+
+## Key Capabilities
+- **Autonomous Orgs**: Create up to 10 independent AI companies with custom missions and agent roles.
+- **Enterprise Ticketing**: Agents collaborate via an internal Kanban board (Open, In Progress, Blocked, Done).
+- **Deep Windows Integration**: 31+ core skills including PowerShell, Python, Browser Relay, and Vision.
+- **Local & Private**: All agent memory and workspace data stay on the local machine.
+- **Twitter/LinkedIn Automation**: Autonomous social media management with vision-preflight safety.
+
+## Architecture
+- **Backend**: Express + Socket.io + Google Gemini (multi-model failover).
+- **Frontend**: React 19 + Vite + Framer Motion.
+- **Extension**: Chrome MV3 relay for authenticated browser automation.
+
+## Project Structure
+- `/src`: Core brain, org orchestration, and skill registry.
+- `/dashboard`: Frontend React application.
+- `/extension`: Chrome extension for browser relay.
+- `/orgs`: Persistent storage for AI companies and agent memories.
+- `/docs`: Technical architecture and user guides.
+
+## Quick Start
+1. `setup.bat` — Install dependencies and configure API keys.
+2. `start.bat` — Launch the server and dashboard.
+3. Access at `http://localhost:5173`.
+
+## Documentation
+- [Architecture Details](docs/ARCHITECTURE.md)
+- [Agent Guidelines](AGENTS.md)
+- [User Guide](docs/USER_GUIDE.md)

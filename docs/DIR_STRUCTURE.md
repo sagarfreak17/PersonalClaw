@@ -8,7 +8,7 @@ PersonalClaw is a local-first AI automation platform for Windows, integrating Ge
 ## Major Directory Descriptions
 
 - `/src`: Backend implementation in TypeScript (Node.js/Express).
-- `/src/core`: Fundamental systems like the Brain, Event Bus, Session Management, Agent Registry, and the **v12.6 Org Orchestration** core (`org-manager.ts`, `org-heartbeat.ts`, `org-task-board.ts`, `org-agent-runner.ts`).
+- `/src/core`: Fundamental systems like the Brain, Event Bus, Session Management, Agent Registry, **Todo Manager**, and the **v12.6 Org Orchestration** core (`org-manager.ts`, `org-heartbeat.ts`, `org-task-board.ts`, `org-agent-runner.ts`).
 - `/src/skills`: Individual tool modules (e.g., shell, files, browser, vision, **org-skills**, **org-management**) that the AI can execute.
 - `/dashboard`: Frontend React + Vite application for interacting with the AI, including the **v12.6 Org Workspace**.
 - `/docs`: Project documentation, including standard user/setup guides, the `ARCHITECTURE.md` spec, and historical/roadmap data in `docs/Updates/`.
@@ -45,6 +45,7 @@ PersonalClaw/
 │   │   │   ├── OrgWorkspace.tsx           # Main org workspace with 8 tabs
 │   │   │   ├── ProposalBoard.tsx          # Code change proposals only (non-code auto-approved)
 │   │   │   ├── TicketBoard.tsx
+│   │   │   ├── TodosTab.tsx               # Task Management — focus mode, stats, charts
 │   │   │   ├── WorkerCard.tsx
 │   │   │   ├── WorkspaceBrowser.tsx       # Directory tree file browser
 │   │   │   └── WorkspaceTab.tsx           # Workspace tab — files by agent role, inline editor, comments
@@ -53,10 +54,12 @@ PersonalClaw/
 │   │   │   ├── useConversations.ts
 │   │   │   ├── useOrgChat.ts
 │   │   │   ├── useOrgs.ts
-│   │   │   └── useScreenshot.ts           # Reusable screen capture hook (getDisplayMedia)
+│   │   │   ├── useScreenshot.ts           # Reusable screen capture hook (getDisplayMedia)
+│   │   │   └── useTodos.ts                # Real-time task state and socket sync
 │   │   ├── types
 │   │   │   ├── conversation.ts
-│   │   │   └── org.ts
+│   │   │   ├── org.ts
+│   │   │   └── todos.ts                   # Todo and TodoStats interfaces
 │   │   ├── App.css
 │   │   ├── App.tsx
 │   │   ├── index.css
@@ -126,7 +129,8 @@ PersonalClaw/
 │   │   ├── sessions.ts
 │   │   ├── skill-lock.ts
 │   │   ├── telegram-brain.ts
-│   │   └── terminal-logger.ts
+│   │   ├── terminal-logger.ts
+│   │   └── todo-manager.ts           # Todo engine, persistence, recurring logic
 │   ├── interfaces
 │   │   └── telegram.ts
 │   ├── skills
@@ -148,6 +152,7 @@ PersonalClaw/
 │   │   ├── scheduler.ts
 │   │   ├── shell.ts
 │   │   ├── system-info.ts
+│   │   ├── todos.ts                   # manage_todos skill
 │   │   ├── twitter.ts
 │   │   └── vision.ts
 │   ├── types

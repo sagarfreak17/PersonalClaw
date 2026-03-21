@@ -208,8 +208,12 @@ If you use the browser tool, your session is isolated to this organisation — y
 
 To connect the browser with your org profile, use: \`browser(action="status")\` to see current mode. The browser skill will automatically use your org-specific profile.
 
-## Working in the Org Root Directory
-Your primary workspace is \`${org.rootDir}\`. You have full read/write access here.
+## File Operations
+- **All file writes MUST go inside your org workspace**: \`${org.workspaceDir}\`
+- Your personal folder is \`${org.workspaceDir}/${agent.role.toLowerCase().replace(/\\s+/g, '-')}/\`
+- When using \`manage_files\`, use relative paths (e.g. \`${agent.role.toLowerCase().replace(/\\s+/g, '-')}/reports/my-report.md\`) — they resolve to the workspace automatically.
+- **NEVER write files to the project root directory or anywhere outside the workspace.**
+- You can read any file, but writes outside the workspace will be blocked.
 
 ## Important Rules
 - Never impersonate other agents or write on their behalf.
@@ -310,7 +314,7 @@ You are in a **direct conversation** with the human owner. This is NOT an autono
 // ─── Brain Factory & Interceptors ─────────────────────────────────
 
 export interface FileActivityEntry {
-  action: 'write' | 'delete' | 'create';
+  action: 'write' | 'delete' | 'create' | 'move';
   path: string;
   agentId: string;
   agentLabel: string;
@@ -332,8 +336,25 @@ async function orgAwareHandleToolCall(
   const WRITE_SKILLS = new Set(['manage_files', 'manage_pdf']);
   const WRITE_ACTIONS = new Set(['write', 'append', 'create', 'delete', 'rename', 'move', 'merge', 'split', 'rotate', 'watermark', 'extract_pages']);
 
-  if (WRITE_SKILLS.has(name) && WRITE_ACTIONS.has(args.action)) {
-    const targetPath = path.resolve(args.path ?? args.output_path ?? '');
+  // Sandbox manage_files writes to the org workspace directory
+  if (name === 'manage_files' && WRITE_ACTIONS.has(args.operation ?? args.action)) {
+    const rawPath = args.filePath ?? args.path ?? '';
+    const resolved = path.isAbsolute(rawPath) ? rawPath : path.resolve(org.workspaceDir, rawPath);
+    const normalised = path.normalize(resolved);
+    const workspaceNorm = path.normalize(org.workspaceDir);
+    if (!normalised.startsWith(workspaceNorm + path.sep) && normalised !== workspaceNorm) {
+      return {
+        intercepted: true,
+        success: false,
+        message: `File operations are restricted to your org workspace: ${org.workspaceDir}. The path "${rawPath}" is outside the workspace. Use a relative path or an absolute path inside the workspace.`,
+      };
+    }
+    // Rewrite filePath to the resolved absolute path within workspace
+    args.filePath = normalised;
+  }
+
+  if (WRITE_SKILLS.has(name) && WRITE_ACTIONS.has(args.operation ?? args.action)) {
+    const targetPath = path.resolve(args.filePath ?? args.path ?? args.output_path ?? '');
     const protectedFiles = orgManager.getProtectedFiles(org.id);
     if (org.protection.mode !== 'none' && isProtectedFile(targetPath, protectedFiles)) {
       return {

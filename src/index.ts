@@ -26,6 +26,7 @@ import { orgTaskBoard } from './core/org-task-board.js';
 import { runOrgAgent, isAgentRunning, closeChatSession, abortChatSession, getAllOrgConversationIds, getRunningAgentsSet } from './core/org-agent-runner.js';
 import { approveProposal, rejectProposal, loadProposals, resetStaleInProgressTickets, getProposalContent } from './core/org-file-guard.js';
 import { storeNotification, getNotifications, setTelegramSender, sendDailyDigest } from './core/org-notification-store.js';
+import { todoManager } from './core/todo-manager.js';
 import cron from 'node-cron';
 
 dotenv.config();
@@ -74,8 +75,20 @@ initScheduler(async (msg) => {
 console.log('[Server] Starting Org Heartbeat Engine...');
 orgHeartbeat.startAll();
 
-// Load persisted activity feed into memory
-loadActivityFromDisk();
+// Run recurring todo engine on startup — catches any missed schedules from reboot
+const recurringSpawned = todoManager.processAllRecurring();
+if (recurringSpawned > 0) {
+  console.log(`[Todos] Spawned ${recurringSpawned} recurring todo(s) on startup`);
+}
+
+// Recurring todos — fire at midnight every day
+cron.schedule('0 0 * * *', () => {
+  const spawned = todoManager.processAllRecurring();
+  if (spawned > 0) {
+    console.log(`[Todos] Midnight: spawned ${spawned} recurring todo(s)`);
+    io.emit('todos:refresh'); // push to dashboard
+  }
+});
 
 cron.schedule('0 9 * * *', async () => {
   for (const org of orgManager.list()) {
@@ -89,9 +102,12 @@ const PORT = process.env.PORT || 3000;
 const activityBuffer: any[] = [];
 const MAX_ACTIVITY = 100;
 
-// NEW — persistence
+// persistence
 const ACTIVITY_FILE = path.join(process.cwd(), 'logs', 'activity.jsonl');
 const MAX_ACTIVITY_FILE_ENTRIES = 1000;
+
+// Load persisted activity feed into memory (must be after ACTIVITY_FILE is declared)
+loadActivityFromDisk();
 
 let activityWriteCount = 0;
 
@@ -209,6 +225,7 @@ function formatActivitySummary(event: any): string {
     case Events.ORG_AGENT_RUN_FAILED: return `Agent run failed: ${event.data?.agentId} — ${event.data?.error}`;
     case Events.ORG_TICKET_CREATED: return `Ticket created: ${event.data?.ticket?.title}`;
     case Events.ORG_TICKET_UPDATED: return `Ticket updated: ${event.data?.ticket?.title}`;
+    case Events.TODOS_RECURRING_FIRED: return `Recurring todo spawned: "${event.data?.title}"`;
     case 'org:notification': return `[${event.data?.orgName ?? 'Org'}] ${event.data?.agentName ?? 'Agent'}: ${event.data?.message ?? ''}`;
     default: return event.type;
   }
@@ -330,6 +347,17 @@ eventBus.on('org:blocker:update', (event: any) => io.emit('org:blocker:update', 
 // File activity (live)
 eventBus.on('org:agent:file_activity', (event: any) => io.emit('org:agent:file_activity', event.data ?? event));
 
+// Todos updates
+eventBus.on(Events.TODOS_UPDATED, () => {
+  io.emit('todos:refresh'); // Dashboard re-fetches on receiving this
+});
+
+eventBus.on(Events.TODOS_RECURRING_FIRED, (event: any) => {
+  const data = event.data ?? event;
+  io.emit('todos:refresh');
+  // Activity feed is already handled by the wildcard listener
+});
+
 // ─── System Metrics Broadcaster ─────────────────────────────────────
 let cachedMetrics = { cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' };
 
@@ -428,6 +456,24 @@ io.on('connection', (socket) => {
     } catch (err: any) {
       socket.emit('conversation:error', { message: err.message });
     }
+  });
+
+  // ── Todos handlers ──
+  socket.on('todos:get', () => {
+    socket.emit('todos:list', {
+      todos: todoManager.query({ status: 'open', parentId: null }).map(t => ({
+        ...t,
+        subtasks: todoManager.getSubtasks(t.id)
+      })),
+      stats: todoManager.getStats()
+    });
+  });
+
+  socket.on('todos:get_all', () => {
+    socket.emit('todos:list_all', {
+      todos: todoManager.getAll(true),
+      stats: todoManager.getStats()
+    });
   });
 
   socket.on('conversation:list', () => {
@@ -771,8 +817,9 @@ io.on('connection', (socket) => {
             if (IGNORED_EXTS.has(ext)) continue;
             try {
               const stat = fs.statSync(path.join(dir, entry.name));
-              // Attribution priority: 1) run log activity, 2) folder-based (top-level folder matches agent role slug)
-              let attribution = agentFileMap[entryPath] ?? null;
+              // Attribution priority: 1) run log activity (relative or absolute path), 2) folder-based (top-level folder matches agent role slug)
+              const absEntryPath = path.join(org.workspaceDir, entryPath);
+              let attribution = agentFileMap[entryPath] ?? agentFileMap[absEntryPath] ?? agentFileMap[absEntryPath.replace(/\\/g, '/')] ?? null;
               if (!attribution) {
                 const topFolder = entryPath.split('/')[0];
                 const folderAgent = roleFolderMap[topFolder];
@@ -1178,6 +1225,89 @@ app.put('/api/orgs/:orgId/tickets/:ticketId', async (req, res) => {
     });
     res.json(ticket);
   } catch (err: any) { res.status(400).json({ error: err.message }); }
+});
+
+// ── Todos REST API ──
+app.get('/api/todos', (req, res) => {
+  const status = (req.query.status as string) ?? 'open';
+  const todos = todoManager.query({
+    status: status as any,
+    parentId: null
+  }).map(t => ({ ...t, subtasks: todoManager.getSubtasks(t.id) }));
+  res.json({ todos, stats: todoManager.getStats() });
+});
+
+app.get('/api/todos/today', (req, res) => {
+  res.json({
+    todos: todoManager.getDueToday(),
+    stats: todoManager.getStats()
+  });
+});
+
+app.post('/api/todos', (req, res) => {
+  try {
+    const todo = todoManager.create(req.body);
+    io.emit('todos:refresh');
+    res.json({ success: true, todo });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/todos/complete', (req, res) => {
+  try {
+    const todo = todoManager.complete(req.body.id);
+    io.emit('todos:refresh');
+    res.json({ success: true, todo });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/todos/reopen', (req, res) => {
+  try {
+    const todo = todoManager.reopen(req.body.id);
+    io.emit('todos:refresh');
+    res.json({ success: true, todo });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/todos/subtask', (req, res) => {
+  try {
+    const subtask = todoManager.create({
+      title: req.body.title,
+      parentId: req.body.parentId,
+      createdBy: 'user',
+      sourceType: 'manual',
+    });
+    io.emit('todos:refresh');
+    res.json({ success: true, subtask });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/todos/:id', (req, res) => {
+  try {
+    todoManager.delete(req.params.id);
+    io.emit('todos:refresh');
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/todos/:id — update a todo (inline editing from dashboard)
+app.put('/api/todos/:id', (req, res) => {
+  try {
+    const todo = todoManager.update(req.params.id, req.body);
+    io.emit('todos:refresh');
+    res.json({ success: true, todo });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ─── Graceful Shutdown ──────────────────────────────────────────────

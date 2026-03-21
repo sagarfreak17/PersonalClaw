@@ -257,13 +257,13 @@ export const orgDelegateSkill: Skill = {
 // ─── org_write_report ─────────────────────────────────────────────
 export const orgWriteReportSkill: Skill = {
   name: 'org_write_report',
-  description: 'Write a report or document to the org root directory. Use for status reports, analyses, or any output meant for the team or the human owner to read.',
+  description: 'Write a report or document to the org workspace. Use for status reports, analyses, or any output meant for the team or the human owner to read. The filename should describe the document content (e.g. "marketing-plan", "competitor-analysis", "hiring-report").',
   parameters: {
     type: 'object',
     properties: {
-      filename: { type: 'string', description: 'Filename including extension, e.g. "weekly-status-2026-03-18.md"' },
+      filename: { type: 'string', description: 'A short descriptive name for the document (without date/role prefix). E.g. "marketing-plan", "competitor-analysis", "quarterly-review". Extension optional (defaults to .md).' },
       content: { type: 'string' },
-      subdirectory: { type: 'string', description: 'Optional subdirectory within the org root dir.' },
+      subdirectory: { type: 'string', description: 'Optional subdirectory within the agent workspace folder.' },
     },
     required: ['filename', 'content'],
   },
@@ -274,10 +274,15 @@ export const orgWriteReportSkill: Skill = {
 
     const agent = org.agents.find(a => a.id === meta.orgAgentId);
     const roleSlug = (agent?.role ?? 'agent').toLowerCase().replace(/\s+/g, '-');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    const dateStr = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
 
-    // FIX-AH: enforce unique filename — {role}-{timestamp}-{original}
-    const safeFilename = `${roleSlug}-${timestamp}-${args.filename}`;
+    // Normalise the filename: strip extension, slugify, then re-add extension
+    let baseName = args.filename.replace(/\.md$/i, '').replace(/\.txt$/i, '');
+    baseName = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const ext = /\.\w+$/.test(args.filename) ? args.filename.match(/\.\w+$/)?.[0] ?? '.md' : '.md';
+
+    // Naming: {document-name}-by-{role}-{YYYY-MM-DD}.md
+    const safeFilename = `${baseName}-by-${roleSlug}-${dateStr}${ext}`;
 
     // Route files into per-agent subdirectory: workspace/{roleSlug}/{subdirectory|reports}/
     const agentDir = path.join(org.workspaceDir, roleSlug);

@@ -7,7 +7,7 @@
 
 ## What Is PersonalClaw?
 
-PersonalClaw is a **local-first AI automation platform** for Windows. It connects Google Gemini models to your desktop, browser, file system, and network through 19 skills (tools). It runs as a Node.js backend (port 3000) with a React dashboard (port 5173).
+PersonalClaw is a **local-first AI automation platform** for Windows. It connects Google Gemini models to your desktop, browser, file system, and network through 20 skills (tools). It runs as a Node.js backend (port 3000) with a React dashboard (port 5173).
 
 **Three modes of operation:**
 
@@ -20,7 +20,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 - AI Backend: Google Gemini (5-model failover chain)
 - Frontend: React 19 + Socket.io (real-time)
 - Browser Control: Playwright + Chrome Extension Relay + Native Chrome CDP
-- Version: 12.6.1
+- Version: 12.7.2
 - Author: Scout Kalra
 
 ---
@@ -30,7 +30,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        DASHBOARD (React)                        │
-│  localhost:5173  •  Socket.io client  •  5 tabs  •  Real-time   │
+│  localhost:5173  •  Socket.io client  •  6 tabs  •  Real-time   │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ Socket.io + REST
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -48,11 +48,11 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 │  └──────────────────────┬─────────────────────────────────────┘ │
 │                         │                                       │
 │  ┌──────────────────────▼─────────────────────────────────────┐ │
-│  │                  19 SKILLS (Tools)                          │ │
+│  │                  20 SKILLS (Tools)                          │ │
 │  │  shell • python • files • vision • clipboard • memory      │ │
 │  │  browser • http • network • processes • sysinfo • pdf      │ │
 │  │  imagegen • agent-spawn • org-management • scheduler       │ │
-│  │  linkedin • twitter  +  13 org-specific skills             │ │
+│  │  linkedin • twitter • todos  +  13 org-specific skills     │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │  ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌───────────┐          │
@@ -82,6 +82,7 @@ PersonalClaw/
 │   │   ├── org-task-board.ts       # Kanban ticket system per org
 │   │   ├── org-file-guard.ts       # File protection + code proposals
 │   │   ├── org-notification-store.ts # Notification persistence + Telegram
+│   │   ├── todo-manager.ts         # Todo CRUD, recurring engine, stats, filtered queries
 │   │   ├── browser.ts              # BrowserManager (Playwright + native Chrome)
 │   │   ├── chrome-mcp.ts           # Chrome 146+ native MCP / CDP adapter
 │   │   ├── relay.ts                # Chrome Extension WebSocket relay
@@ -111,10 +112,12 @@ PersonalClaw/
 │       ├── org-skills.ts           # 13 org-agent-only skills
 │       ├── linkedin.ts             # linkedin_post
 │       ├── twitter.ts              # twitter_post
-│       └── scheduler.ts            # manage_scheduler
+│       ├── scheduler.ts            # manage_scheduler
+│       └── todos.ts                # manage_todos (12 actions, read-write lock)
 ├── dashboard/
+│   ├── vite.config.ts              # Vite config — proxies /api → http://localhost:3000
 │   └── src/
-│       ├── App.tsx                 # Main app — sidebar, tabs, metrics, socket
+│       ├── App.tsx                 # Main app — sidebar, 6 tabs, metrics, socket
 │       ├── index.css               # Full design system (light theme, indigo accent)
 │       ├── components/
 │       │   ├── ChatWorkspace.tsx    # Multi-pane resizable chat layout
@@ -124,16 +127,19 @@ PersonalClaw/
 │       │   ├── OrgWorkspace.tsx     # 8-tab org management container
 │       │   ├── WorkspaceTab.tsx     # IDE-style file explorer + editor + comments
 │       │   ├── OrgProtectionSettings.tsx # File protection config
+│       │   ├── TodosTab.tsx         # Todos UI — stats bar, filters, add form, inline edit, focus mode, recurring create form
 │       │   └── ...                 # CreateOrgModal, CreateAgentModal, etc.
 │       ├── hooks/
 │       │   ├── useConversations.ts  # Chat state + socket handlers
 │       │   ├── useOrgs.ts          # Org/agent/ticket/proposal state
 │       │   ├── useOrgChat.ts       # Agent direct messaging
 │       │   ├── useAgents.ts        # Sub-agent worker tracking
-│       │   └── useScreenshot.ts    # Screen capture via DisplayMedia
+│       │   ├── useScreenshot.ts    # Screen capture via DisplayMedia
+│       │   └── useTodos.ts         # Todos state, socket sync, filter logic
 │       └── types/
 │           ├── org.ts              # Org, OrgAgent, Ticket, Proposal, Blocker
-│           └── conversation.ts     # Message, WorkerAgentInfo
+│           ├── conversation.ts     # Message, WorkerAgentInfo
+│           └── todos.ts            # Todo, TodoStats, TodoFilter interfaces
 ├── extension/                      # Chrome MV3 relay extension
 │   ├── manifest.json
 │   ├── background.js               # WebSocket to ws://127.0.0.1:3000/relay
@@ -150,6 +156,7 @@ PersonalClaw/
 │   ├── self_learned.json           # Auto-learned patterns
 │   ├── learning_log.json           # Learning event history
 │   ├── scheduled_jobs.json         # Active cron jobs
+│   ├── todos.json                  # All todos + recurring templates (atomic write)
 │   ├── session_*.json              # Saved conversation sessions
 │   └── audit/audit_YYYY-MM-DD.jsonl
 ├── orgs/                           # Per-org isolated directories
@@ -445,6 +452,29 @@ Params: `content` (max 280 chars), `dry_run`. Requires extension relay + `twitte
 
 Jobs persisted to `memory/scheduled_jobs.json`. When cron fires, sends `[INTERNAL_SCHEDULER] Periodic Task Execution: {command}` to the Brain.
 
+### 20. Todos — `manage_todos`
+
+| Action | Lock | Behavior |
+|--------|------|----------|
+| `create` | Write (`todos`) | Create a new todo with optional priority/dueDate/tags/subtask |
+| `list` | Read | Get todos with filters (status, priority, tag); top-level only |
+| `due_today` | Read | Get all open todos due today + overdue count |
+| `complete` | Write | Mark todo done by ID |
+| `reopen` | Write | Uncheck a completed todo |
+| `update` | Write | Edit any field (title, notes, priority, dueDate, tags, estimatedMinutes) |
+| `delete` | Write | Remove todo + all its subtasks permanently |
+| `add_subtask` | Write | Add a child todo under a parent (max 1 level deep) |
+| `create_recurring` | Write | Create recurring template (spawns copies on schedule) |
+| `list_recurring` | Read | List all recurring templates |
+| `delete_recurring` | Write | Remove template; preserves past instances |
+| `stats` | Read | Get completion stats for the week |
+
+Data persisted atomically to `memory/todos.json` (write-to-tmp then rename). Recurring templates are processed at midnight via `node-cron` and on server startup.
+
+**Stats:** All counts in `getStats()` (Open, Done, Due Today, Overdue, High Priority, Completed This Week) apply to **top-level todos only** (`!parentId`), matching exactly what the dashboard list displays. Subtasks are excluded from stats.
+
+**Org agent restrictions:** Agents cannot `complete`, `delete`, or `delete_recurring` user-created todos (runtime guard checks `createdBy`). Agents should always set `createdBy: 'agent'`, `sourceLabel`, and `sourceType` when creating todos.
+
 ---
 
 ## Skill Locking System
@@ -461,6 +491,7 @@ Prevents concurrent access to shared resources in multi-agent execution.
 | `clipboard` | Exclusive | 5s | clipboard |
 | `memory` | Read-Write | 5s | memory, org_read/write_memory |
 | `scheduler` | Read-Write | 5s | scheduler |
+| `todos` | Read-Write | 5s | todos |
 | `files:{path}` | Read-Write | 10s | files, pdf, task board |
 
 **Usage pattern:**
@@ -689,6 +720,8 @@ All subsystems communicate via typed events. The dashboard subscribes to the eve
 
 **Relay:** `relay:extension_connected`, `relay:extension_disconnected`, `relay:tabs_update`
 
+**Todos:** `todos:updated`, `todos:recurring_fired`
+
 **System:** `system:server_started`, `system:server_shutdown`, `system:scheduler_fired`
 
 **Learning:** `learning:started`, `learning:completed`, `learning:failed`
@@ -750,6 +783,18 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 | POST | `/api/orgs/:id/proposals/:id/approve` | Approve code change |
 | POST | `/api/orgs/:id/proposals/:id/reject` | Reject code change |
 
+### Todos
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/todos` | List all open todos (top-level + subtasks) |
+| GET | `/api/todos/today` | Get todos due today + overdue count |
+| POST | `/api/todos` | Create a new todo |
+| PUT | `/api/todos/:id` | Update todo fields (inline edit) |
+| POST | `/api/todos/complete` | Mark todo done `{id}` |
+| POST | `/api/todos/reopen` | Uncheck completed todo `{id}` |
+| POST | `/api/todos/subtask` | Add subtask `{parentId, title, ...}` |
+| DELETE | `/api/todos/:id` | Delete todo and its subtasks |
+
 ### System
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -782,6 +827,8 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 | `org:workspace:file:write` | `{orgId, path, content}` | Write file |
 | `org:workspace:file:comment` | `{orgId, path, comment}` | Add comment |
 | `org:workspace:organize` | `{orgId}` | Organize files into agent folders |
+| `todos:get` | — | Request open todos list |
+| `todos:get_all` | — | Request all todos including recurring templates |
 
 ### Server → Client
 | Event | Payload | Purpose |
@@ -798,6 +845,9 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 | `org:agent:run_update` | `{orgId, agentId, running}` | Agent run state |
 | `org:agent:response` | `{orgId, agentId, chatId, text}` | Agent chat response |
 | `org:agent:file_activity` | `{orgId, agentId, activity[]}` | Files changed |
+| `todos:list` | `todos[]` | Response to `todos:get` |
+| `todos:list_all` | `todos[]` | Response to `todos:get_all` (includes templates) |
+| `todos:refresh` | — | Emitted after any write operation — clients re-fetch |
 
 ---
 
@@ -805,13 +855,24 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 
 **Stack:** React 19, Socket.io Client, Framer Motion, React Resizable Panels, Lucide icons, react-markdown
 
+### Vite Dev Proxy
+
+`dashboard/vite.config.ts` proxies all `/api/*` requests to `http://localhost:3000` during development. This is required because the dashboard runs on port 5173 (Vite) while the REST API is on port 3000 (Express). Without it, all `fetch('/api/...')` calls would return Vite HTML instead of JSON, silently failing.
+
+```js
+server: { proxy: { '/api': 'http://localhost:3000' } }
+```
+
+Socket.io connects directly to `http://localhost:3000` (hardcoded in `App.tsx`) and is unaffected by this proxy.
+
 ### Main Tabs
 | Tab | Purpose |
 |-----|---------|
 | **Command Center** | Multi-pane chat (up to 3), tool feed, sub-agent panels |
 | **System Metrics** | CPU/RAM/disk sparklines, session info |
 | **Activity Feed** | Real-time event stream with color-coded dots |
-| **Skills & Config** | All 19 skills listed, quick command cards |
+| **Todos** | Personal task manager — stats, filters, add form, inline edit, focus mode, recurring |
+| **Skills & Config** | All 20 skills listed, quick command cards |
 | **Orgs** | Organization management workspace |
 
 ### Org Workspace Sub-Tabs
@@ -843,15 +904,19 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 1. Load `.env`
 2. Create Express + HTTP server + Socket.io
 3. Initialize Telegram (if token set)
-4. Load skills (19 registered)
+4. Load skills (20 registered)
 5. Initialize scheduler (load persisted cron jobs)
 6. Load orgs from disk
 7. Start org heartbeat engine (schedule all agent crons)
 8. Reset stale in-progress tickets
-9. Initialize audit logger
-10. Start HTTP server
-11. Attach extension relay at `/relay`
-12. Print startup banner
+9. Process recurring todos (spawn due instances for today)
+10. Schedule midnight cron for recurring todo processing (`0 0 * * *`)
+11. Declare `ACTIVITY_FILE` constant + initialize activity buffer
+12. Load persisted activity feed from disk into memory (`loadActivityFromDisk`)
+13. Initialize audit logger
+14. Start HTTP server
+15. Attach extension relay at `/relay`
+16. Print startup banner
 
 ### Shutdown (SIGINT/SIGTERM)
 1. Stop Telegram bot polling (prevents 409 conflicts on restart)
@@ -994,4 +1059,4 @@ export const skills: Skill[] = [ ..., mySkill ];
 
 ---
 
-*Last updated: 2026-03-21 — PersonalClaw v12.6.1*
+*Last updated: 2026-03-21 — PersonalClaw v12.7.2*

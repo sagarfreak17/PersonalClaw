@@ -165,5 +165,9 @@ export const Events = {
 
   // Direct agent chat (FIX-I: chat session lifecycle)
   ORG_AGENT_CHAT_CLOSED: 'org:agent:chat_closed',
+
+  // ─── v13 Todo Events ──────────────────────────────────────────────
+  TODOS_UPDATED: 'todos:updated',                   // Any mutation — dashboard re-fetches
+  TODOS_RECURRING_FIRED: 'todos:recurring_fired',   // A recurring template spawned a new instance
 } as const;
 

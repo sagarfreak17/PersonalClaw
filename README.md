@@ -12,31 +12,21 @@ PersonalClaw is a sophisticated, locally-hosted AI agent that combines Google Ge
 
 ## ✨ v12.6 — Twitter/X Automation & Relay Vision (NEW)
 
-### 🗂️ Workspace Tab
-- **Files by agent role** — Workspace files organised by the agent that created them, with collapsible sections.
-- **Inline editor** — Click any file to view and edit it directly in the dashboard.
-- **Human comment system** — Leave feedback on any file. Comments are injected into the agent's next run prompt.
-- **Comments sidecar** — Stored as `{filename}.comments.json`, automatically hidden from file listings.
+### 🐦 Twitter/X Auto-Post Skill
+- **Relay-Based Automation** — Fully automated posting via `twitter_post` skill using browser relay and pyautogui replays.
+- **Vision Pre-flight** — Automatic screenshot analysis via Gemini Vision before posting to ensure:
+  - User is logged in to x.com.
+  - Page is ready (no modals or loading spinners).
+  - Target elements are visible.
+- **Fail-Safe execution** — Zero-retry policy on script failure to maintain automation safety.
+- **Post History** — Direct logging of all tweet attempts in `logs/twitter_post.log`.
 
-### ✏️ Edit Agent — Reports To Dropdown
-- **Visual reporting line** — Edit Agent modal now includes a dropdown to set the agent's manager.
-- **Agent name + role** — Each option shows both name and role for clarity.
-
-### 🔔 Notification Fix
-- **No more `[undefined] undefined` toasts** — All notification emission points now have null guards.
-- **Proper field mapping** — Proposal and blocker notifications correctly populate orgName and agentName.
-
-### 📋 Proposals — Code Only
-- **Filtered view** — Proposals tab only shows code change proposals.
-- **Auto-approve** — Documents, plans, and hiring decisions are automatically approved (unless `requiresApproval: true`).
-
-### 📊 Board Tab Improvements
-- **Clickable health cards** — Expand to show full run summary, all file activity, and run history.
-- **Focused view** — Removed proposals section and workspace browser (both have dedicated tabs).
-
-### 🔒 Protection Visibility
-- **View all protected files** — Expandable section in Settings showing every protected file, grouped by directory.
-- **Git fix** — `snapshotGitFiles()` now runs from `org.rootDir` (not `workspaceDir`).
+### 🛡️ v12.2–v12.5 Refinements
+- **Per-Agent Workspace Folders** — Automatic file organisation into `workspace/ceo/`, `workspace/cto/`, etc.
+- **IDE-Style Workspace** — Redesigned workspace with resizable split layout, timeline view, and agent color-coding.
+- **Human Loop Reinforcement** — Inline comment panels on workspace files for direct feedback injection into agent prompts.
+- **Screenshot-to-Chat 2.0** — Restored high-fidelity screen capture for both main and direct agent chats.
+- **Auto-Approval System** — Documentation, plans, and hiring decisions are auto-approved to reduce human overhead.
 
 ---
 
@@ -180,10 +170,10 @@ Open [http://localhost:5173](http://localhost:5173) (The batch file will launch 
 
 | Metric | Value |
 |--------|-------|
-| **Core Skills** | 15 |
+| **Core Skills** | 18 |
 | **Org-Mgmt Skills** | 1 |
 | **Org-Agent Skills** | 13 |
-| **Total Skills** | 29 |
+| **Total Skills** | 31 |
 | **Dashboard Tabs** | 8 (Agents, Tickets, Board, Workspace, Proposals, Activity, Memory, Settings) |
 | **Max Orgs** | 10 |
 | **Max human panes** | 3 |

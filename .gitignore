@@ -26,7 +26,7 @@ Thumbs.db
 
 # Browser & Media
 browser_data/
-*.png
+/*.png
 
 # Scratch / Test files
 test_vision.js

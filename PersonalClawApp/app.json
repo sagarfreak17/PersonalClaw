@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "PersonalClaw",
+    "slug": "PersonalClawApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "package": "com.personalclaw.PersonalClawApp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "75f1fe16-44e3-45b4-a0c0-66182a5bf5c6"
+      }
+    },
+    "owner": "personalclaw"
+  }
+}

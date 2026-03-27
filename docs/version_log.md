@@ -2,6 +2,24 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.9.3] - 2026-03-26
+
+### Dashboard: Performance & Connection Stability
+
+- **Fixed: Typing lag in chat window** — `systeminformation` calls (`si.currentLoad`, `si.mem`, `si.fsSize`) were running every 2 seconds, blocking the Node.js event loop long enough to cause Socket.IO ping timeouts. Increased metrics interval from 2s → 5s and split disk stats to run only every 30s (6th tick), cutting event loop blocking by ~60%.
+- **Fixed: Frequent "disconnected/connected" toast flicker** — added explicit `pingInterval: 15000` and `pingTimeout: 10000` to the Socket.IO server config, giving more tolerance during brief event loop stalls from metrics collection.
+- **Improved: Socket.IO client reconnection** — added `reconnectionDelay`, `reconnectionDelayMax`, `reconnectionAttempts: Infinity` to the dashboard Socket.IO client for more resilient connections. Removed explicit `transports: ['websocket', 'polling']` which was forcing websocket-first and causing silent connection failures.
+- **Improved: Metrics rendering performance** — wrapped the 3 metrics `setState` calls (`setMetrics`, `setCpuHistory`, `setRamHistory`) in `queueMicrotask()` to batch them into a single React re-render, since Socket.IO callbacks run outside React's automatic batching scope.
+- **Fixed: Chat input losing focus after send** — the textarea in `ConversationPane` was disabled via `isWaiting` while the bot responds, which ejects focus. Added `useEffect` to auto-refocus when `isWaiting` flips back to false. Also added `onMouseDown={preventDefault}` on send/screenshot buttons to prevent them from stealing focus on click.
+
+#### Files Changed
+- **Updated**: `src/index.ts` — Socket.IO server `pingInterval`/`pingTimeout`, metrics interval 2s → 5s, disk stats every 30s
+- **Updated**: `dashboard/src/App.tsx` — Socket.IO client reconnection config (removed forced `transports`), `queueMicrotask` batched metrics updates
+- **Updated**: `dashboard/src/components/ConversationPane.tsx` — auto-refocus textarea after bot response, `preventDefault` on button mouseDown
+- **Updated**: `dashboard/src/components/ChatInput.tsx` — matching refocus and preventDefault fixes (legacy component)
+
+---
+
 ## [12.9.2] - 2026-03-23
 
 ### CLI: Setup Script Fixes

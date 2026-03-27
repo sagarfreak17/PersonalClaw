@@ -24,7 +24,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 - Mobile: React Native / Expo SDK 55 (Android)
 - Browser Control: Playwright + Chrome Extension Relay + Native Chrome CDP
 - Remote Access: Cloudflare Tunnel (`https://api.utilization-tracker.online`)
-- Version: 12.9.1
+- Version: 12.9.3
 - Author: Scout Kalra
 
 ---
@@ -955,7 +955,7 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 | Event | Payload | Purpose |
 |-------|---------|---------|
 | `init` | `{skills, activity, model, conversations}` | Initial state on connect |
-| `metrics` | `{cpu, ram, totalRam, disk, totalDisk}` | System telemetry (every 10s) |
+| `metrics` | `{cpu, ram, totalRam, disk, totalDisk}` | System telemetry (every 5s; disk refreshed every 30s) |
 | `response` | `{text, conversationId, metadata}` | Chat response |
 | `tool_update` | `{text, conversationId}` | Tool execution progress |
 | `chat:tool_feed` | `{tool, args, result, duration}` | Raw tool feed (super-user) |
@@ -1180,4 +1180,4 @@ export const skills: Skill[] = [ ..., mySkill ];
 
 ---
 
-*Last updated: 2026-03-23 — PersonalClaw v12.8.0*
+*Last updated: 2026-03-26 — PersonalClaw v12.9.3*

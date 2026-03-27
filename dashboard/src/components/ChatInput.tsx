@@ -31,6 +31,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [text]);
 
+
   const handleSend = () => {
     if (!text.trim() && !pendingScreenshot) return;
     if (text.trim()) {
@@ -39,6 +40,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
     onSendMessage(text);
     setText('');
+    // Re-focus after React finishes the parent re-render cycle (setMessages, setIsBotTyping, scrollIntoView)
+    setTimeout(() => textareaRef.current?.focus(), 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -117,6 +120,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <button
           className="screenshot-btn"
           onClick={onScreenshot}
+          onMouseDown={e => e.preventDefault()}
           disabled={isCapturing}
           title="Capture Screenshot"
         >
@@ -125,6 +129,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <button
           className="send-btn"
           onClick={handleSend}
+          onMouseDown={e => e.preventDefault()}
           style={{ height: '44px' }}
           title="Send (Enter)"
         >

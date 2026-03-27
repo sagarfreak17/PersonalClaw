@@ -38,6 +38,13 @@ export function ConversationPane(props: ConversationPaneProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [props.messages]);
 
+  // Re-focus textarea when it becomes enabled again (after bot finishes responding)
+  useEffect(() => {
+    if (!props.isWaiting) {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+  }, [props.isWaiting]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     if (textareaRef.current) {
@@ -53,6 +60,8 @@ export function ConversationPane(props: ConversationPaneProps) {
     setInput('');
     clearScreenshot();
     if (textareaRef.current) textareaRef.current.style.height = '44px';
+    // Re-focus after React finishes the parent re-render + scrollIntoView
+    setTimeout(() => textareaRef.current?.focus(), 150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -176,6 +185,7 @@ export function ConversationPane(props: ConversationPaneProps) {
           <button
             className="screenshot-btn"
             onClick={captureScreenshot}
+            onMouseDown={e => e.preventDefault()}
             disabled={isCapturing || props.isWaiting}
             title="Share Screenshot"
           >
@@ -192,6 +202,7 @@ export function ConversationPane(props: ConversationPaneProps) {
           ) : (
             <button
               onClick={handleSend}
+              onMouseDown={e => e.preventDefault()}
               disabled={!input.trim() && !pendingScreenshot}
               className="send-btn"
             >&uarr;</button>

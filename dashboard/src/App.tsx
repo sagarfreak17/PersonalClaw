@@ -104,7 +104,11 @@ const App: React.FC = () => {
 
   // ── Socket.io connection ──
   useEffect(() => {
-    const newSocket = io('http://localhost:3000');
+    const newSocket = io('http://localhost:3000', {
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+    });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -124,9 +128,13 @@ const App: React.FC = () => {
     });
 
     newSocket.on('metrics', (data: any) => {
-      setMetrics(data);
-      setCpuHistory(prev => [...prev.slice(-29), data.cpu]);
-      setRamHistory(prev => [...prev.slice(-29), parseFloat(data.ram)]);
+      // Batch into unstable_batchedUpdates equivalent — React 18 auto-batches in event handlers
+      // but socket callbacks run outside React's scope, so we use a microtask to coalesce renders
+      queueMicrotask(() => {
+        setMetrics(data);
+        setCpuHistory(prev => [...prev.slice(-29), data.cpu]);
+        setRamHistory(prev => [...prev.slice(-29), parseFloat(data.ram)]);
+      });
     });
 
     newSocket.on('response', (data: { text: string; metadata?: any }) => {

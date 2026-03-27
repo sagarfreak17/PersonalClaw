@@ -36,6 +36,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
   maxHttpBufferSize: 10e6, // 10MB for image uploads
+  pingInterval: 15000,     // check connection every 15s (default 25s)
+  pingTimeout: 10000,      // allow 10s for pong reply (default 20s)
 });
 
 app.use(express.json());
@@ -361,29 +363,33 @@ eventBus.on(Events.TODOS_RECURRING_FIRED, (event: any) => {
 // ─── System Metrics Broadcaster ─────────────────────────────────────
 let cachedMetrics = { cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' };
 
+// Metrics at 5s interval (was 2s — si calls are heavy and can block the event loop,
+// causing Socket.IO ping timeouts → spurious disconnects)
+let metricsTick = 0;
 setInterval(async () => {
   try {
-    const [cpu, mem, disk] = await Promise.all([
-      si.currentLoad(),
-      si.mem(),
-      si.fsSize(),
-    ]);
+    metricsTick++;
+    // CPU + RAM every tick; disk only every 6th tick (30s) since it rarely changes
+    const fast = await Promise.all([si.currentLoad(), si.mem()]);
+    const cpu = fast[0];
+    const mem = fast[1];
 
-    const mainDisk = disk.find(d => d.mount === 'C:') || disk[0];
+    cachedMetrics.cpu = Math.round(cpu.currentLoad);
+    cachedMetrics.ram = (mem.active / (1024 * 1024 * 1024)).toFixed(1);
+    cachedMetrics.totalRam = (mem.total / (1024 * 1024 * 1024)).toFixed(1);
 
-    cachedMetrics = {
-      cpu: Math.round(cpu.currentLoad),
-      ram: (mem.active / (1024 * 1024 * 1024)).toFixed(1),
-      totalRam: (mem.total / (1024 * 1024 * 1024)).toFixed(1),
-      disk: mainDisk ? ((mainDisk.used) / (1024 * 1024 * 1024)).toFixed(0) : '0',
-      totalDisk: mainDisk ? ((mainDisk.size) / (1024 * 1024 * 1024)).toFixed(0) : '0',
-    };
+    if (metricsTick % 6 === 1) {
+      const disk = await si.fsSize();
+      const mainDisk = disk.find(d => d.mount === 'C:') || disk[0];
+      cachedMetrics.disk = mainDisk ? ((mainDisk.used) / (1024 * 1024 * 1024)).toFixed(0) : '0';
+      cachedMetrics.totalDisk = mainDisk ? ((mainDisk.size) / (1024 * 1024 * 1024)).toFixed(0) : '0';
+    }
 
     io.emit('metrics', cachedMetrics);
   } catch (error) {
     console.error('[Metrics] Error:', error);
   }
-}, 2000);
+}, 5000);
 
 // ─── Socket.io — Real-time Dashboard ────────────────────────────────
 const mobileSocketIds = new Set<string>();

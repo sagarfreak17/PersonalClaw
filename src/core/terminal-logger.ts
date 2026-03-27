@@ -80,13 +80,14 @@ class TerminalLogger {
     } catch { /* ignore */ }
   }
 
-  private write(level: string, args: any[]): void {
-    if (!this.stream) return;
+  private write(level: string, args: any[]): string | undefined {
+    if (!this.stream) return undefined;
     try {
       const timestamp = new Date().toISOString();
       const message = util.format(...args);
       this.stream.write(`[${timestamp}] [${level}] ${message}\n`);
-    } catch { /* never let logging crash the server */ }
+      return message;
+    } catch { return undefined; /* never let logging crash the server */ }
   }
 
   private intercept(): void {
@@ -96,17 +97,32 @@ class TerminalLogger {
 
     console.log = (...args: any[]) => {
       origLog(...args);
-      this.write('INFO', args);
+      const msg = this.write('INFO', args);
+      if (msg) {
+        import('./events.js').then(({ eventBus, Events }) => {
+          eventBus.dispatch(Events.LOG_EMITTED, { level: 'INFO', message: msg, timestamp: Date.now() }, 'terminal');
+        }).catch(() => {});
+      }
     };
 
     console.warn = (...args: any[]) => {
       origWarn(...args);
-      this.write('WARN', args);
+      const msg = this.write('WARN', args);
+      if (msg) {
+        import('./events.js').then(({ eventBus, Events }) => {
+          eventBus.dispatch(Events.LOG_EMITTED, { level: 'WARN', message: msg, timestamp: Date.now() }, 'terminal');
+        }).catch(() => {});
+      }
     };
 
     console.error = (...args: any[]) => {
       origError(...args);
-      this.write('ERROR', args);
+      const msg = this.write('ERROR', args);
+      if (msg) {
+        import('./events.js').then(({ eventBus, Events }) => {
+          eventBus.dispatch(Events.LOG_EMITTED, { level: 'ERROR', message: msg, timestamp: Date.now() }, 'terminal');
+        }).catch(() => {});
+      }
     };
   }
 }

@@ -2,6 +2,43 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.10.1] - 2026-03-27
+
+### Dashboard: Real-time Thinking Console (Super User)
+
+- **New: Inline Thinking Console**: Added a terminal-styled "Thought Process" box directly into the dashboard chat interface, exposing internal AI reasoning, tool calls, and background activity.
+- **Collapsible & Scrollable UI**: Each assistant message now features a collapsible console block. Long tool execution sequences are contained within a scrollable area (max 300px) with color-coded log entries.
+- **Per-Message Routing**: Logs are intelligently filtered to show only the background activity relevant to the assistant's specific response, solving the issue of terminal log consolidation.
+- **Real-time "Thinking" State**: While the AI is processing, a live "Thinking..." console appears inline with the typing indicator.
+- **Super User Gate**: Feature is strictly gated behind Super User mode (`Alt+Shift+S`) to prevent overwhelming standard users with technical logs.
+- **Backend Log Streaming**: Updated `TerminalLogger` to dispatch `LOG_EMITTED` events via the `EventBus`, which are then broadcast via Socket.IO for real-time dashboard visibility.
+- **Increased Log Buffer**: Dashboard log state now maintains up to 500 entries per conversation to support long, complex autonomy sessions.
+- **Cleaned Workspace UI**: Removed redundant inline tool feed items (gears/checkmarks) in favor of the more detailed Log Console.
+
+#### Files Changed
+- **New**: `dashboard/src/components/LogConsole.tsx` — inline collapsible terminal component
+- **Updated**: `src/core/events.ts` — added `LOG_EMITTED` event
+- **Updated**: `src/core/terminal-logger.ts` — added EventBus dispatching to log interceptor
+- **Updated**: `src/index.ts` — socket broadcasting for `chat:log` events
+- **Updated**: `dashboard/src/components/ConversationPane.tsx` — integrated inline consoles, removed old tool feed
+- **Updated**: `dashboard/src/components/ChatWorkspace.tsx` — managed per-conversation log buffers
+- **Updated**: `dashboard/src/index.css` — dark terminal styling for inline consoles
+
+## [12.10.0] - 2026-03-27
+
+### Team GPS CSAT Integration
+
+- **New Team GPS CSAT Skill**: Added native `teamgps_csat` skill, allowing the AI to query partner health, engineer scorecards, and unreviewed concerns directly from chat.
+- **Skill Actions**:
+  - `list_companies`: See all partners with review counts and scores.
+  - `partner_summary`: Full CSAT analysis for one partner.
+  - `at_risk_partners`: Scan all partners and flag those with declining scores or unreviewed concerns.
+  - `engineer_scorecard`: Performance scorecard for a specific engineer with risk level.
+  - `unreviewed_concerns`: All Neutral/Negative reviews not yet reviewed by management.
+  - `period_summary`: Org-wide digest across all partners.
+  - `search`: Keyword search across all comments and internal notes.
+- **API Integration**: Connects via `TEAMGPS_API_KEY` defined in the `.env` file. Handles rate-limits and paginated responses robustly.
+
 ## [12.9.3] - 2026-03-26
 
 ### Dashboard: Performance & Connection Stability

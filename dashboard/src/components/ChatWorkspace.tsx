@@ -5,6 +5,7 @@ import { useConversations } from '../hooks/useConversations';
 import { useAgents } from '../hooks/useAgents';
 import { ConversationPane } from './ConversationPane';
 import type { ToolFeedItem } from '../types/org';
+import type { LogEntry } from '../types/conversation';
 
 interface ChatWorkspaceProps {
   socket: Socket;
@@ -12,7 +13,7 @@ interface ChatWorkspaceProps {
 }
 
 function PaneWithAgents({ conversationId, label, messages, isWaiting,
-  isSuperUser, showCloseButton, socket, onSend, onClose, onAbort, toolFeedItems }: any) {
+  isSuperUser, showCloseButton, socket, onSend, onClose, onAbort, toolFeedItems, conversationLogs }: any) {
   const {
     workers, isPanelOpen, selectedAgentLogs,
     requestLogs, togglePanel, activeCount,
@@ -25,6 +26,7 @@ function PaneWithAgents({ conversationId, label, messages, isWaiting,
       isAgentPanelOpen={isPanelOpen} activeWorkerCount={activeCount}
       selectedAgentLogs={selectedAgentLogs} isWaiting={isWaiting}
       isSuperUser={isSuperUser} toolFeedItems={toolFeedItems}
+      conversationLogs={conversationLogs}
       showCloseButton={showCloseButton}
       onSend={onSend} onClose={onClose} onAbort={onAbort}
       onToggleAgentPanel={togglePanel} onRequestLogs={requestLogs}
@@ -39,6 +41,7 @@ export function ChatWorkspace({ socket, isSuperUser }: ChatWorkspaceProps) {
   } = useConversations(socket);
 
   const [toolFeeds, setToolFeeds] = useState<Record<string, ToolFeedItem[]>>({});
+  const [logs, setLogs] = useState<Record<string, LogEntry[]>>({});
 
   useEffect(() => {
     if (!socket) return;
@@ -48,9 +51,29 @@ export function ChatWorkspace({ socket, isSuperUser }: ChatWorkspaceProps) {
         [item.conversationId]: [...(prev[item.conversationId] ?? []).slice(-20), item],
       }));
     };
+    const logHandler = ({ conversationId, log }: { conversationId?: string; log: LogEntry }) => {
+      setLogs(prev => {
+        const next = { ...prev };
+        // If it targets a specific conversation...
+        if (conversationId) {
+          next[conversationId] = [...(next[conversationId] ?? []).slice(-500), log];
+        } else {
+          // If global log, broadcast to all currently rendered active conversations
+          for (const c of conversations) {
+            next[c.id] = [...(next[c.id] ?? []).slice(-500), log];
+          }
+        }
+        return next;
+      });
+    };
+    
     socket.on('chat:tool_feed', handler);
-    return () => { socket.off('chat:tool_feed', handler); };
-  }, [socket]);
+    socket.on('chat:log', logHandler);
+    return () => { 
+      socket.off('chat:tool_feed', handler); 
+      socket.off('chat:log', logHandler);
+    };
+  }, [socket, conversations]);
 
   return (
     <div className="chat-workspace">
@@ -77,6 +100,7 @@ export function ChatWorkspace({ socket, isSuperUser }: ChatWorkspaceProps) {
                   showCloseButton={conversations.length > 1}
                   socket={socket}
                   toolFeedItems={isSuperUser ? (toolFeeds[convo.id] ?? []) : []}
+                  conversationLogs={isSuperUser ? (logs[convo.id] ?? []) : []}
                   onSend={(text: string, image?: string) => sendMessage(convo.id, text, image)}
                   onClose={() => closeConversation(convo.id)}
                   onAbort={() => abortConversation(convo.id)}

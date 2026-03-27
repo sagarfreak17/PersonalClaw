@@ -24,7 +24,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 - Mobile: React Native / Expo SDK 55 (Android)
 - Browser Control: Playwright + Chrome Extension Relay + Native Chrome CDP
 - Remote Access: Cloudflare Tunnel (`https://api.utilization-tracker.online`)
-- Version: 12.9.3
+- Version: 12.10.1
 - Author: Scout Kalra
 
 ---
@@ -128,7 +128,8 @@ PersonalClaw/
 │       ├── index.css               # Full design system (light theme, indigo accent)
 │       ├── components/
 │       │   ├── ChatWorkspace.tsx    # Multi-pane resizable chat layout
-│       │   ├── ConversationPane.tsx # Single chat with markdown, workers, screenshots
+│       │   ├── ConversationPane.tsx # Single chat with markdown, workers, screenshots, and inline thinking console
+│       │   ├── LogConsole.tsx       # Collapsible terminal UI for thinking logs
 │       │   ├── MessageCopyButton.tsx # Copy-to-clipboard button for AI messages
 │       │   ├── AgentCard.tsx        # Org agent card + EditAgentModal
 │       │   ├── AgentChatPane.tsx    # Direct agent messaging (minimize/close)
@@ -482,7 +483,16 @@ Make HTTP requests. Params: `method`, `url`, `headers` (JSON string), `body`, `t
 
 12 actions: `overview`, `hardware`, `storage`, `software`, `updates`, `drivers`, `events`, `security`, `battery`, `environment`, `uptime`, `users`. All via PowerShell.
 
-### 12. PDF — `manage_pdf`
+### 12. Thinking Console (Super User Only)
+
+Exposes real-time internal AI reasoning and tool execution logs directly in the dashboard chat.
+
+- **Implementation**: `TerminalLogger` intercepts all console outputs and dispatches them via `EventBus.LOG_EMITTED`.
+- **UI Integration**: `LogConsole` component provides a collapsible, dark-themed terminal view.
+- **Routing**: Logs are automatically associated with specific message threads via timestamp-based filtering in `ConversationPane`.
+- **Toggle**: Activated by the Super User shortcut `Alt + Shift + S`.
+
+### 13. PDF — `manage_pdf`
 
 8 actions: `extract_text`, `metadata`, `merge`, `split`, `rotate`, `watermark`, `create`, `extract_pages`. Uses `pdf-lib` + `pdfjs-dist`. Output to `outputs/`. Write lock per output path.
 

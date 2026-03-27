@@ -2677,3 +2677,79 @@ h1 {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* ─── Inline Log Console (Per Message) ─── */
+.inline-log-console {
+  margin: 10px 0;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e1e1e;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.inline-log-console.closed {
+  border-color: transparent;
+  background: rgba(30, 30, 30, 0.03);
+}
+
+.inline-log-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #252526;
+  border: none;
+  color: #9cdafe;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.inline-log-header:hover {
+  background: #2d2d2d;
+}
+
+.inline-log-console.closed .inline-log-header {
+  background: transparent;
+  color: var(--text-dim);
+  padding: 4px 8px;
+}
+
+.inline-log-body {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid #333;
+}
+
+.inline-log-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inline-log-body::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 3px;
+}
+
+.message-bubble.assistant .message-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.message-bubble.system {
+  align-self: center;
+  max-width: 90%;
+  margin: 10px 0;
+}
+

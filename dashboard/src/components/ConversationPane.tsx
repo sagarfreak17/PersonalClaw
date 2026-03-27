@@ -4,9 +4,10 @@ import remarkGfm from 'remark-gfm';
 import { Camera, Loader2, X } from 'lucide-react';
 import type { Message, WorkerAgentInfo, WorkerLog } from '../types/conversation';
 import type { ToolFeedItem } from '../types/org';
-import { WorkerCard } from './WorkerCard';
 import { useScreenshot } from '../hooks/useScreenshot';
 import { MessageCopyButton } from './MessageCopyButton';
+import { LogConsole } from './LogConsole';
+import { WorkerCard } from './WorkerCard';
 
 interface ConversationPaneProps {
   conversationId: string;
@@ -19,6 +20,7 @@ interface ConversationPaneProps {
   isWaiting: boolean;
   isSuperUser: boolean;
   toolFeedItems?: ToolFeedItem[];
+  conversationLogs?: any[]; // Allow LogEntry[] dynamically passed
   showCloseButton: boolean;
   onSend: (text: string, image?: string) => void;
   onClose: () => void;
@@ -54,6 +56,30 @@ export function ConversationPane(props: ConversationPaneProps) {
     }
   };
 
+  const getLogsForAssistantMessage = (index: number) => {
+    if (!props.isSuperUser || !props.conversationLogs) return [];
+    const currentMsg = props.messages[index];
+    const prevMsg = props.messages[index - 1]; // user message
+    const startTs = prevMsg ? new Date(prevMsg.timestamp).getTime() : 0;
+    const endTs = new Date(currentMsg.timestamp).getTime() + 2000;
+    return props.conversationLogs.filter(l => l.timestamp >= startTs && l.timestamp <= endTs);
+  };
+
+  const getActiveLogs = () => {
+    if (!props.isSuperUser || !props.conversationLogs || !props.isWaiting) return [];
+    const lastMsg = props.messages[props.messages.length - 1];
+    const startTs = lastMsg ? new Date(lastMsg.timestamp).getTime() : 0;
+    return props.conversationLogs.filter(l => l.timestamp >= startTs);
+  };
+
+  const getIdleLogs = () => {
+    if (!props.isSuperUser || !props.conversationLogs || props.isWaiting) return [];
+    const lastMsg = props.messages[props.messages.length - 1];
+    if (!lastMsg) return [];
+    const idleStartTime = new Date(lastMsg.timestamp).getTime() + 2000;
+    return props.conversationLogs.filter(l => l.timestamp > idleStartTime);
+  };
+
   const handleSend = () => {
     if (!input.trim() && !pendingScreenshot) return;
     props.onSend(input.trim(), pendingScreenshot || undefined);
@@ -77,7 +103,6 @@ export function ConversationPane(props: ConversationPaneProps) {
   return (
     <div className="conversation-pane">
       <div className="pane-header">
-        <span className="pane-label">{props.label}</span>
         <div className="pane-header-actions">
           {props.workers.length > 0 && (
             <button className="agent-badge" onClick={props.onToggleAgentPanel}>
@@ -93,40 +118,48 @@ export function ConversationPane(props: ConversationPaneProps) {
 
       <div className="pane-body">
         <div className="message-list">
-          {props.messages.map(msg => (
-            <div key={msg.id} className={`message-bubble ${msg.role}`}>
-              <div className="message-avatar">
-                {msg.role === 'assistant' ? '🤖' : '👤'}
-              </div>
-              <div className="message-text">
-                {msg.role === 'assistant' && (
-                  <MessageCopyButton text={msg.text} />
-                )}
-                {msg.image && (
-                  <img src={msg.image} alt="Screenshot" className="message-image" />
-                )}
-                {msg.role === 'assistant' ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-                ) : msg.text}
-              </div>
-            </div>
-          ))}
-          {props.isSuperUser && props.toolFeedItems && props.toolFeedItems.length > 0 && (
-            <div className="tool-feed-inline">
-              {props.toolFeedItems.slice(-8).map((item, i) => (
-                <div key={i} className={`tool-feed-item tool-feed-item--${item.type}`}>
-                  <span className="tool-feed-icon">{item.type === 'started' ? '\u2699\uFE0F' : item.success === false ? '\u274C' : '\u2705'}</span>
-                  <code>{item.tool}</code>
-                  {item.durationMs && <span className="tool-feed-duration">{item.durationMs}ms</span>}
-                  <span className="tool-feed-time">{new Date(item.timestamp).toLocaleTimeString()}</span>
+          {props.messages.map((msg, index) => {
+            const inlineLogs = msg.role === 'assistant' ? getLogsForAssistantMessage(index) : [];
+            return (
+              <div key={msg.id} className={`message-bubble ${msg.role}`}>
+                <div className="message-avatar">
+                  {msg.role === 'assistant' ? '🤖' : '👤'}
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="message-text" style={{ width: '100%', minWidth: 0 }}>
+                  {msg.role === 'assistant' && inlineLogs.length > 0 && (
+                    <LogConsole logs={inlineLogs} title="Thought Process" startOpen={false} />
+                  )}
+                  {msg.role === 'assistant' && (
+                    <MessageCopyButton text={msg.text} />
+                  )}
+                  {msg.image && (
+                    <img src={msg.image} alt="Screenshot" className="message-image" />
+                  )}
+                  {msg.role === 'assistant' ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                  ) : msg.text}
+                </div>
+              </div>
+            );
+          })}
+          {/* Inline tool feed removed now that LogConsole is present */}
           {props.isWaiting && (
             <div className="message-bubble assistant">
               <div className="message-avatar">🤖</div>
-              <div className="typing-indicator"><span /><span /><span /></div>
+              <div className="message-text" style={{ width: '100%', minWidth: 0 }}>
+                <div className="typing-indicator" style={{ marginBottom: props.isSuperUser ? '8px' : 0 }}><span /><span /><span /></div>
+                {getActiveLogs().length > 0 && (
+                  <LogConsole logs={getActiveLogs()} title="Thinking..." startOpen={true} />
+                )}
+              </div>
+            </div>
+          )}
+          
+          {getIdleLogs().length > 0 && (
+            <div className="message-bubble system">
+               <div className="message-text" style={{ width: '100%', minWidth: 0 }}>
+                 <LogConsole logs={getIdleLogs()} title="System Activity" startOpen={false} />
+               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -160,6 +193,7 @@ export function ConversationPane(props: ConversationPaneProps) {
             ))}
           </div>
         </div>
+        {/* Inline console blocks are used instead of a global one */}
       </div>
 
       <div className="pane-input-area">

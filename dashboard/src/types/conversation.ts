@@ -42,3 +42,9 @@ export interface WorkerLog {
   agentId: string;
   logs: string[];
 }
+
+export interface LogEntry {
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+  timestamp: number;
+}

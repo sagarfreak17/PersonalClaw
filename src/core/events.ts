@@ -101,6 +101,7 @@ export const Events = {
   DASHBOARD_DISCONNECTED: 'system:dashboard_disconnected',
   TELEGRAM_MESSAGE: 'system:telegram_message',
   SCHEDULER_FIRED: 'system:scheduler_fired',
+  LOG_EMITTED: 'system:log_emitted',
 
   // Learning events
   LEARNING_STARTED: 'learning:started',

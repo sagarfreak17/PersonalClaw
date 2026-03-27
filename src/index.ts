@@ -250,6 +250,40 @@ eventBus.on('brain:tool_called', (event: any) => {
   }
 });
 
+// ─── Super User Log Streaming ───────────────────────────────────────
+eventBus.on(Events.LOG_EMITTED, (event: any) => {
+  const data = event.data ?? event;
+  const msg: string = typeof data.message === 'string' ? data.message : String(data.message);
+  
+  // Try to extract conversationId or agentId from common log prefixes like [Brain:conv_123]
+  const brainMatch = msg.match(/\[Brain:([^\]]+)\]/);
+  
+  // Format the log entry
+  const logEntry = {
+    level: data.level,
+    message: msg,
+    timestamp: data.timestamp
+  };
+
+  if (brainMatch) {
+    // Specific conversation/agent log
+    const agentId = brainMatch[1];
+    let conversationId = agentId;
+    
+    // In PersonalClaw, primary chat brains are often named "primary_conv_123"
+    if (agentId.startsWith('primary_')) {
+      conversationId = agentId.replace('primary_', '');
+    }
+    
+    io.emit('chat:log', { conversationId, log: logEntry });
+  } else {
+    // Global log (Learner, Vision, Server, Scheduler, etc.)
+    // We broadcast this without a specific conversationId so the frontend can choose 
+    // to display it in all active chat panes.
+    io.emit('chat:log', { log: logEntry });
+  }
+});
+
 eventBus.on('brain:tool_completed', (event: any) => {
   const data = event.data ?? event;
   if (!data.isWorker) {

@@ -45,7 +45,7 @@ app.use('/outputs', express.static(path.join(process.cwd(), 'outputs')));
 app.use('/screenshots', express.static(path.join(process.cwd(), 'screenshots')));
 
 // ─── Core Initialization ────────────────────────────────────────────
-console.log('[Server] Initializing PersonalClaw v12.9.0...');
+console.log(`[Server] Initializing PersonalClaw v${process.env.npm_package_version || '12.11.1'}...`);
 
 console.log('[Server] Checking Telegram configuration...');
 const telegram = new TelegramInterface();
@@ -454,14 +454,14 @@ io.on('connection', (socket) => {
     })),
   }));
 
-  socket.emit('init', {
-    version: '12.9.0',
-    skills: skills.map(s => ({ name: s.name, description: s.description.split('\n')[0] })),
-    metrics: cachedMetrics,
-    activity: activityBuffer.slice(-20),
-    conversations: convoList,
-    orgs: orgManager.list(), // v12 addition
-  });
+    socket.emit('init', {
+      version: process.env.npm_package_version || '12.11.1',
+      skills: skills.map(s => ({ name: s.name, description: s.description.split('\n')[0] })),
+      metrics: cachedMetrics,
+      activity: activityBuffer.slice(-20),
+      conversations: convoList,
+      orgs: orgManager.list(),
+    });
 
   // ── Multi-chat message handler ──
   socket.on('message', async (payload: { text: string; conversationId: string; image?: string }) => {

@@ -6,7 +6,7 @@ For the full technical deep-dive (every interface, every event, every endpoint),
 
 ---
 
-## Project Structure (12.9.1)
+## Project Structure (12.11.2)
 
 ```
 PersonalClaw/
@@ -38,7 +38,7 @@ PersonalClaw/
 │   │   └── telegram-brain.ts       # Isolated Telegram Brain instance
 │   ├── interfaces/
 │   │   └── telegram.ts             # Telegraf bot — polling, retry, markdown formatting, typing indicator
-│   └── skills/                     # 20 registered skills
+│   └── skills/                     # 21 registered skills
 │       ├── index.ts                # Skill registry, getToolDefinitions(), handleToolCall()
 │       ├── shell.ts                # execute_powershell — PowerShell commands
 │       ├── python.ts               # run_python_script — dynamic Python execution
@@ -60,7 +60,8 @@ PersonalClaw/
 │       ├── linkedin.ts             # linkedin_post — pyautogui replay automation
 │       ├── twitter.ts              # twitter_post — relay + vision pre-flight + pyautogui
 │       ├── todos.ts                # manage_todos — personal todo list (12 actions, read-write lock)
-│       └── desktop-automation.ts   # desktop_automation — pywinauto Windows app automation (10 actions)
+│       ├── desktop-automation.ts   # desktop_automation — pywinauto Windows app automation (10 actions)
+│       └── teamgps.ts              # teamgps_csat — MSP partner health & scorecard (8 actions)
 ├── dashboard/                      # React 19 + Vite frontend (port 5173)
 │   ├── vite.config.ts              # Vite config — proxies /api → http://localhost:3000 (required for REST calls)
 │   └── src/
@@ -156,19 +157,23 @@ PersonalClaw/
 Dashboard (:5173) ←──Socket.io──→ Express Server (:3000) ←──Socket.io──→ Android App
                                        │                                  (Cloudflare Tunnel)
                     ┌──────────────────┼──────────────────┐
-                    │                  │                  │
-             ConversationMgr      OrgManager         Relay (/relay)
-             (3 human chats)    + Heartbeat Engine   (Chrome extension)
-                    │              + TaskBoard
-                    │                  │
-                    └────── Brain ─────┘
+                    │  21 SKILLS (Tools)                  │
+                    │  shell • python • files • vision    │
+                    │  clipboard • memory • browser       │
+                    │  http • network • processes         │
+                    │  sysinfo • pdf • imagegen           │
+                    │  agent-spawn • org-management       │
+                    │  scheduler • linkedin • twitter     │
+                    │  todos • desktop • teamgps          │
+                    │  + 13 org-specific skills           │
+                    └─────────────────────────────────────┘
                            (Gemini)
                               │
-                        20 Skills + 13 Org Skills
+                        21 Skills + 13 Org Skills
 
 Telegram (Telegraf) ──polling──→ telegramBrain (isolated Brain)
                                   │
-                             20 Skills (NO org skills)
+                             21 Skills (NO org skills)
                              Separate history, no persistence
 
 Android App (PersonalClawApp) ──Socket.io over Cloudflare Tunnel──→ Express Server
@@ -208,7 +213,7 @@ Android App (PersonalClawApp) ──Socket.io over Cloudflare Tunnel──→ Ex
 ## AI Engine (Brain)
 
 - **Class**, not singleton — each chat/agent/worker gets its own instance
-- **Model failover:** `gemini-3-flash-preview → gemini-3.1-pro-preview → gemini-2.5-pro → gemini-2.5-flash → gemini-3.1-flash-lite-preview`
+- **Model failover:** \`gemini-3.1-pro-preview → gemini-3-flash-preview → gemini-2.5-pro → gemini-2.5-flash → gemini-3.1-flash-lite-preview\`
 - **Tool loop:** message → Gemini responds with tool calls → execute via `handleToolCall()` → inject results → loop until text-only response
 - **Context compaction:** auto-summarizes at ~50 messages to stay within 1M token limit
 - **Org agents:** Brain gets persona system prompt (mission, role, colleagues, tickets, memory, human comments)

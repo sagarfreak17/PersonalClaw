@@ -1,44 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ChatInput from './components/ChatInput';
 import { ChatWorkspace } from './components/ChatWorkspace';
 import { OrgWorkspace } from './components/OrgWorkspace';
 import { TodosTab } from './components/TodosTab';
 
 import { io, Socket } from 'socket.io-client';
 import {
-  Bot,
-  User,
-  FileCode,
-  Shield,
-  LayoutDashboard,
   Activity,
-  Clock,
-  HardDrive,
   Cpu,
   Database,
-  Copy,
-  Check,
+  HardDrive,
   Zap,
   Search,
-  X,
-  History,
   Terminal,
-  Wifi,
-  WifiOff,
-  ChevronRight,
-  ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
   Sparkles,
-  ArrowUp,
   Building2,
   CheckSquare,
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 interface Message {
   id: string;
@@ -66,21 +48,17 @@ interface SkillInfo {
 type TabType = 'command' | 'metrics' | 'activity' | 'skills' | 'orgs' | 'todos';
 
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Welcome back. PersonalClaw v12.6 is online and ready.', sender: 'bot', timestamp: new Date() }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [metrics, setMetrics] = useState({ cpu: 0, ram: '0', totalRam: '0', disk: '0', totalDisk: '0' });
-  const [isCapturing, setIsCapturing] = useState(false);
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [pendingScreenshot, setPendingScreenshot] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('command');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState('');
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
-  const [toolUpdates, setToolUpdates] = useState<string[]>([]);
   const [serverInfo, setServerInfo] = useState<any>(null);
   const [loadedSkills, setLoadedSkills] = useState<SkillInfo[]>([]);
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
@@ -139,7 +117,6 @@ const App: React.FC = () => {
 
     newSocket.on('response', (data: { text: string; metadata?: any }) => {
       setIsBotTyping(false);
-      setToolUpdates([]);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text: data.text,
@@ -147,10 +124,6 @@ const App: React.FC = () => {
         timestamp: new Date(),
         metadata: data.metadata,
       }]);
-    });
-
-    newSocket.on('tool_update', (data: { text: string }) => {
-      setToolUpdates(prev => [...prev, data.text]);
     });
 
     newSocket.on('activity', (item: ActivityItem) => {
@@ -225,7 +198,6 @@ const App: React.FC = () => {
 
     setMessages(prev => [...prev, newMessage]);
     setIsBotTyping(true);
-    setToolUpdates([]);
 
     socket.emit('message', {
       text: text || 'Analyze this image.',
@@ -235,42 +207,6 @@ const App: React.FC = () => {
     setPendingScreenshot(null);
   }, [pendingScreenshot, socket]);
 
-  // ── Screenshot capture ──
-  const handleScreenshot = async () => {
-    if (!socket) return;
-    setIsCapturing(true);
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: "always" } as any,
-        audio: false
-      });
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      await new Promise((resolve) => {
-        video.onloadedmetadata = () => { video.play(); resolve(true); };
-      });
-      await new Promise(r => setTimeout(r, 500));
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = canvas.toDataURL('image/png');
-      stream.getTracks().forEach(track => track.stop());
-      setPendingScreenshot(imageData);
-    } catch (err) {
-      console.error('Screenshot failed:', err);
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
 
   // ── Command palette commands ──
   const commands = [
@@ -326,7 +262,7 @@ const App: React.FC = () => {
           <Sparkles size={22} style={{ color: 'var(--accent-primary)' }} />
           {!sidebarCollapsed && <h1>PersonalClaw</h1>}
         </div>
-        {!sidebarCollapsed && <div className="version-badge">v12.6.1</div>}
+        {!sidebarCollapsed && <div className="version-badge">v{serverInfo?.version || '12.11.1'}</div>}
 
         <nav style={{ flex: 1 }}>
           <ul style={{ listStyle: 'none' }}>
@@ -382,8 +318,8 @@ const App: React.FC = () => {
           <div className={`dot ${connected ? 'green' : 'red'}`} />
           {!sidebarCollapsed && (
             <div style={{ fontSize: '0.75rem' }}>
-              <div style={{ color: 'var(--text-dim)' }}>Agent</div>
-              <div style={{ fontWeight: 600 }}>{connected ? 'Online' : 'Offline'}</div>
+              <div style={{ color: '#94a3b8' }}>Agent</div>
+              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{connected ? 'Online' : 'Offline'}</div>
             </div>
           )}
         </div>
@@ -421,10 +357,6 @@ const App: React.FC = () => {
             <div className="stat-bar">
               <div className="stat-bar-fill" style={{ width: `${parseFloat(metrics.totalDisk) > 0 ? (parseFloat(metrics.disk) / parseFloat(metrics.totalDisk)) * 100 : 0}%` }} />
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label"><Zap size={14} /> Session</div>
-            <div className="stat-value">{messages.filter(m => m.sender === 'user').length} turns</div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "personalclaw",
-  "version": "12.9.0",
+  "version": "12.11.2",
   "type": "module",
   "main": "index.js",
   "scripts": {

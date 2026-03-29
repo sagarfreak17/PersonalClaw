@@ -2,6 +2,36 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.11.2] - 2026-03-29
+
+### Dashboard: Modernized Sidebar & Dark Theme Fixes
+
+- **New: Modern Sidebar Theme**: Sidebar completely redesigned with a dark `#0f172a` background, glassmorphism, and smooth transitions.
+- **Improved Metrics Dashboard**: Metrics status bar now uses a cleaner, light-mode card system with better typography and shadow depth.
+- **Brain: Missing Thought Signature Fix**: Resolved an issue with Gemini 3 (Thinking) model where the internal "thought process" was not being correctly extracted or displayed in the dashbard.
+- **Documentation Sync**: Updated project structure and skill counts in README.md, AGENTS.md, and docs/ARCHITECTURE.md.
+
+---
+
+## [12.11.1] - 2026-03-29
+
+### Dashboard: Remove Session Turns Widget
+
+Removed the broken "Session: 0 turns" stat card from the dashboard status bar. The `activeTurns` tracking via `getAllTurnCounts()` was unreliable (always showed 0 due to Gemini history timing issues). Cleaned up all related server-side logic.
+
+- **Removed**: Session stat card from dashboard status grid (now 3 cards: CPU, RAM, Disk)
+- **Removed**: `getAllTurnCounts()` method from `ConversationManager`
+- **Removed**: `activeTurns` from `metrics` Socket.IO emission and `init` event payload
+- **Removed**: `activeTurns` state update from dashboard metrics handler
+
+#### Files Changed
+- **Updated**: `dashboard/src/App.tsx` — removed session stat card and activeTurns state logic
+- **Updated**: `src/index.ts` — removed activeTurns from metrics and init emissions
+- **Updated**: `src/core/conversation-manager.ts` — removed `getAllTurnCounts()` method
+- **Updated**: `docs/ARCHITECTURE.md` — updated Socket.IO event table and tab descriptions
+
+---
+
 ## [12.11.0] - 2026-03-29
 
 ### Brain: LLM Response Speed Overhaul

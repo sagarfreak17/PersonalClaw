@@ -1,4 +1,4 @@
-# PersonalClaw v12.8 🛸
+# PersonalClaw v12.11.2 🛸
 
 **The next-generation Windows AI agent. Local. Private. Unstoppable. Now on Android.**
 
@@ -23,8 +23,8 @@ Unlike cloud agents, your agent memories, workspace files, and system interactio
 ### 🤖 Autonomous Multi-Agent Orchestration
 Not just a chatbot. PersonalClaw uses a professional Kanban system where agents (CEO, CTO, Marketing, etc.) collaborate via an internal ticket board. They delegate, raise blockers, and propose code changes.
 
-### 🛠️ 31+ Core System Skills
-From **authenticated browser automation** (via extension relay) to **PowerShell system control**, **automated social media posting** (Twitter/LinkedIn), and **Gemini Vision analysis**, PersonalClaw has the “hands” to do real work.
+### 🛠️ 34+ Core System Skills
+From **authenticated browser automation** (via extension relay) to **PowerShell system control**, **desktop app automation** (pywinauto), **automated social media posting** (Twitter/LinkedIn), and **Gemini Vision analysis**, PersonalClaw has the “hands” to do real work. Now with **Real-time Streaming** for near-instant responses.
 
 ### 📱 Android App — Control From Anywhere
 Full-featured React Native app with real-time chat, org management, voice input (hold-to-talk), and push notifications. Approve proposals, resolve blockers, and monitor agents — all from your phone. Connects securely via Cloudflare Tunnel.
@@ -83,12 +83,13 @@ Configure the server URL in Settings to connect remotely via Cloudflare Tunnel.
 ## 📊 Latest Stats
 | Metric | Value |
 |--------|-------|
-| **Core Skills** | 18 |
+| **Core Skills** | 21 |
 | **Org-Mgmt Skills** | 1 |
 | **Org-Agent Skills** | 13 |
-| **Total Skills** | 31 |
+| **Total Skills** | 34 |
 | **Dashboard Tabs** | 8 |
 | **Max Orgs** | 10 |
+| **Response Latency** | ~1s (Streaming) |
 | **Mobile Screens** | 7 (Chat, Orgs, Activity, Metrics, Settings, Auth, Org Detail) |
 
 ---

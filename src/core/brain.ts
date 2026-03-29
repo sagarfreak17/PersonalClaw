@@ -214,7 +214,7 @@ Use this knowledge proactively. Adapt your tone, shortcuts, and workflow to matc
     }
   } catch { /* ignore corrupt file */ }
 
-  return `# PersonalClaw v11.0 — Autonomous Windows Agent
+  return `# PersonalClaw v${process.env.npm_package_version || '12.11.0'} — Autonomous Windows Agent
 
 You are **PersonalClaw**, a locally-hosted autonomous AI agent with full system access on this Windows machine. You are not a chatbot — you are an **operator**. You have ${skills.length} tools, built-in **Google Search grounding**, persistent memory, a triple-mode browser, and the ability to spawn sub-agents for parallel work.
 
@@ -1449,6 +1449,21 @@ need to do and ask the parent conversation to confirm before acting.`;
       toolTurns++;
 
       const allParts = response.candidates[0].content.parts;
+      
+      // ─── Thinking Signature Reconciliation (Fix for Gemini 3/Thinking Models) ───
+      // If the model turn includes a thought part with a signature, all subsequent 
+      // functionCall parts in the same turn MUST include that thought_signature.
+      let currentThoughtSignature: string | undefined;
+      for (const part of allParts) {
+        if (part.thought && (part as any).thought_signature) {
+          currentThoughtSignature = (part as any).thought_signature;
+        }
+        if (part.functionCall && currentThoughtSignature && !(part as any).thought_signature) {
+          console.debug(`[Brain] Attaching missing thought_signature to tool call: ${part.functionCall.name}`);
+          (part as any).thought_signature = currentThoughtSignature;
+        }
+      }
+
       const toolCalls = allParts.filter((part: any) => part.functionCall);
       const toolResults: any[] = [];
       const meta = this.buildMeta();

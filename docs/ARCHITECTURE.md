@@ -24,7 +24,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 - Mobile: React Native / Expo SDK 55 (Android)
 - Browser Control: Playwright + Chrome Extension Relay + Native Chrome CDP
 - Remote Access: Cloudflare Tunnel (`https://api.utilization-tracker.online`)
-- Version: 12.10.1
+- Version: 12.11.1
 - Author: Scout Kalra
 
 ---
@@ -52,11 +52,12 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 │  └──────────────────────┬─────────────────────────────────────┘ │
 │                         │                                       │
 │  ┌──────────────────────▼─────────────────────────────────────┐ │
-│  │                  20 SKILLS (Tools)                          │ │
+│  │                  21 SKILLS (Tools)                          │ │
 │  │  shell • python • files • vision • clipboard • memory      │ │
 │  │  browser • http • network • processes • sysinfo • pdf      │ │
 │  │  imagegen • agent-spawn • org-management • scheduler       │ │
-│  │  linkedin • twitter • todos • desktop  + 13 org-specific   │ │
+│  │  linkedin • twitter • todos • desktop • teamgps            │ │
+│  │  + 13 org-specific skills                                  │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │  ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌───────────┐          │
@@ -310,7 +311,7 @@ The Brain is a **class** (not singleton). Each chat pane, each org agent chat, a
 ### Model Failover Chain
 
 ```
-gemini-3-flash-preview → gemini-3.1-pro-preview → gemini-2.5-pro → gemini-2.5-flash → gemini-3.1-flash-lite-preview
+gemini-3.1-pro-preview → gemini-3-flash-preview → gemini-2.5-pro → gemini-2.5-flash → gemini-3.1-flash-lite-preview
 ```
 
 If the primary model returns 404, 503, 429, or auth error, the Brain automatically tries the next model. The chain is logged and visible via `/status`.
@@ -549,12 +550,13 @@ These are injected into org agent Brains only (not available in human chat):
 | `org_propose_code_change` | Submit code change for human review |
 | `org_raise_blocker` | Raise blocker needing human intervention |
 | `org_submit_for_review` | Submit plans/docs (auto-approved unless flagged) |
+| `teamgps_csat` | Analyze customer satisfaction data |
 
-### 17. LinkedIn — `linkedin_post`
+### 18. LinkedIn — `linkedin_post`
 
 Posts to LinkedIn via pyautogui click replay. Requires `LINKEDIN_SCRIPT_DIR` env, `linkedin_steps.json` (from Teacher.py), and content (max 3000 chars). Supports `dry_run`.
 
-### 18. Twitter — `twitter_post`
+### 19. Twitter — `twitter_post`
 
 Fully automated X/Twitter posting via the extension relay:
 1. Checks relay connected
@@ -567,7 +569,7 @@ Fully automated X/Twitter posting via the extension relay:
 
 Params: `content` (max 280 chars), `dry_run`. Requires extension relay + `twitter_steps.json`.
 
-### 19. Desktop Automation — `desktop_automation`
+### 20. Desktop Automation — `desktop_automation`
 
 **Windows native app automation** via pywinauto (UIA backend). Requires `pip install pywinauto` and `pip install Pillow` (for window screenshots). Each action builds a Python script, executes it with a 30-second subprocess timeout, and parses JSON output. **Exclusive lock** on `desktop`.
 
@@ -588,7 +590,7 @@ Params: `content` (max 280 chars), `dry_run`. Requires extension relay + `twitte
 
 **Not available to org agents** (filtered alongside `execute_powershell` and `run_python_script`).
 
-### 20. Scheduler — `manage_scheduler`
+### 21. Scheduler — `manage_scheduler`
 
 | Action | Lock | Behavior |
 |--------|------|----------|
@@ -598,7 +600,7 @@ Params: `content` (max 280 chars), `dry_run`. Requires extension relay + `twitte
 
 Jobs persisted to `memory/scheduled_jobs.json`. When cron fires, sends `[INTERNAL_SCHEDULER] Periodic Task Execution: {command}` to the Brain.
 
-### 21. Todos — `manage_todos`
+### 22. Todos — `manage_todos`
 
 | Action | Lock | Behavior |
 |--------|------|----------|
@@ -725,7 +727,7 @@ When an agent runs (cron/manual/event/chat):
    - Human comments on workspace files
    - 11-step workflow: read memory → check tickets → create ticket → execute → report
 3. **Filter tools**: remove `execute_powershell`, `run_python_script`, `manage_scheduler`, `desktop_automation` (safety)
-4. **Inject org skills**: 13 org-specific tools
+4. **Inject org skills**: 14 org-specific tools
 5. **Tool interception**: write operations checked against protection list
 6. Process message → log run to `runs.jsonl`
 
@@ -776,9 +778,10 @@ The Telegram bot is a **completely isolated** Brain instance — separate from t
 Telegram App → Telegraf (long polling) → telegramBrain.processMessage()
                                               │
                                         Isolated Brain
-                                        (agentId: telegram_primary)
-                                              │
-                                        19 standard skills
+                                        └────── Brain ─────┘
+                           (Gemini)
+                              │
+                        21 Skills + 14 Org Skills
                                         (NO org skills)
 ```
 
@@ -980,7 +983,7 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 ### Server → Client
 | Event | Payload | Purpose |
 |-------|---------|---------|
-| `init` | `{skills, activity, model, conversations}` | Initial state on connect |
+| `init` | `{skills, activity, conversations}` | Initial state on connect |
 | `metrics` | `{cpu, ram, totalRam, disk, totalDisk}` | System telemetry (every 5s; disk refreshed every 30s) |
 | `response` | `{text, conversationId, metadata}` | Chat response |
 | `tool_update` | `{text, conversationId}` | Tool execution progress |
@@ -1016,7 +1019,7 @@ Socket.io connects directly to `http://localhost:3000` (hardcoded in `App.tsx`) 
 | Tab | Purpose |
 |-----|---------|
 | **Command Center** | Multi-pane chat (up to 3), tool feed, sub-agent panels |
-| **System Metrics** | CPU/RAM/disk sparklines, session info |
+| **System Metrics** | CPU/RAM/disk sparklines |
 | **Activity Feed** | Real-time event stream with color-coded dots |
 | **Todos** | Personal task manager — stats, filters, add form, inline edit, focus mode, recurring |
 | **Skills & Config** | All 21 skills listed, quick command cards |
@@ -1206,4 +1209,4 @@ export const skills: Skill[] = [ ..., mySkill ];
 
 ---
 
-*Last updated: 2026-03-26 — PersonalClaw v12.9.3*
+*Last updated: 2026-03-29 — PersonalClaw v12.11.1*

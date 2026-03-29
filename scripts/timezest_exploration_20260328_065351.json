@@ -1,0 +1,1647 @@
+{
+  "meta": {
+    "run_at": "2026-03-28T06:53:51.676526",
+    "base_url": "https://api.timezest.com/v1",
+    "date_range": "2026-03-14 to 2026-04-27",
+    "total_records": 34,
+    "appointment_types": {
+      "apty_6vIb8BzwyXlL1LYAlv9mQg": "15 Minute Appointment Teams",
+      "apty_1GxGrh8jONa2uOZSmEDNHs": "30 Minute Appointment Teams",
+      "apty_3G5vZaTwuOpmqWcY1BzgCr": "Workstation Setup - Remote (2 hours)",
+      "apty_6fatfnwq5eeVgCAJA3XVK8": "Project-30 Minute Call",
+      "apty_2L4CE47URburQauXnnwe4P": "Onsite",
+      "apty_8iehurHu2L8JStxHAN2Fz": "Remote Access to PC ",
+      "apty_5pMQCb43AuUxY9hMHUBiFn": "Maintenance Window",
+      "apty_61wD2QcMYFCTniVkQH77Jb": "Remote Access to PC",
+      "apty_55JvnKqOfQEDmVWrUZsrju": "Workstation Setup - Onsite",
+      "apty_2bX5d8g1wnCyG6M3Bysxnl": "In-Person Appointment",
+      "apty_6aU73FoQwsd63Bc5vCRP9E": "Remote Access to PC",
+      "apty_GeudoH11AFFPG5QTnefsa": "30 Minute Phone Call",
+      "apty_5xFYSPLwzHAGsbIIsbAlkh": "Phone Call"
+    },
+    "statuses_found": [
+      "scheduled",
+      "sent",
+      "new",
+      "cancelled"
+    ],
+    "engineers_found": [
+      "Aaron Stowe",
+      "Isam Hashim",
+      "Scout Kalra",
+      "Zack Venable",
+      "Shana Arevalo",
+      "MSP Red Team",
+      "Jason Skidmore"
+    ]
+  },
+  "appointment_types": {
+    "apty_6vIb8BzwyXlL1LYAlv9mQg": "15 Minute Appointment Teams",
+    "apty_1GxGrh8jONa2uOZSmEDNHs": "30 Minute Appointment Teams",
+    "apty_3G5vZaTwuOpmqWcY1BzgCr": "Workstation Setup - Remote (2 hours)",
+    "apty_6fatfnwq5eeVgCAJA3XVK8": "Project-30 Minute Call",
+    "apty_2L4CE47URburQauXnnwe4P": "Onsite",
+    "apty_8iehurHu2L8JStxHAN2Fz": "Remote Access to PC ",
+    "apty_5pMQCb43AuUxY9hMHUBiFn": "Maintenance Window",
+    "apty_61wD2QcMYFCTniVkQH77Jb": "Remote Access to PC",
+    "apty_55JvnKqOfQEDmVWrUZsrju": "Workstation Setup - Onsite",
+    "apty_2bX5d8g1wnCyG6M3Bysxnl": "In-Person Appointment",
+    "apty_6aU73FoQwsd63Bc5vCRP9E": "Remote Access to PC",
+    "apty_GeudoH11AFFPG5QTnefsa": "30 Minute Phone Call",
+    "apty_5xFYSPLwzHAGsbIIsbAlkh": "Phone Call"
+  },
+  "raw_scheduling_requests": [
+    {
+      "id": "sreq_6yBk67KgdENZzQwWvibUUu",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 19301,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 323,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964400,
+          "number": "#964400",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "abutterworth@integrissolutions.com",
+      "end_user_name": "Ashley Butterworth",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774650862,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/3kHTPmb8lqLroUwqs1oe",
+      "selected_start_time": 1774969200,
+      "selected_time_zone": "Arizona",
+      "status": "scheduled",
+      "created_at": 1774644599,
+      "updated_at": 1774650862
+    },
+    {
+      "id": "sreq_6HLDEjXAzlVIGcxtXZQeYI",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24266,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 24851,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 955708,
+          "number": "#955708",
+          "type": "connectwise_psa/project_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "codyburdette@beck-technology.com",
+      "end_user_name": "Cody Burdette",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/ig6yZe8DWaNMsRLShCSJ",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "sent",
+      "created_at": 1774641691,
+      "updated_at": 1774641736
+    },
+    {
+      "id": "sreq_3UdPL1IL6BHXPzjPTk7PP6",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21621,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 20666,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964695,
+          "number": "#964695",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "bhiggins@shieldslegal.com",
+      "end_user_name": "Bart Higgins",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774637863,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/cEMiY7wetH91Tgzt92Eb",
+      "selected_start_time": 1774877400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774634635,
+      "updated_at": 1774637863
+    },
+    {
+      "id": "sreq_1npEmCrxvgeftid93is92U",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 250,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 384,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964229,
+          "number": "#964229",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "terry@pts.team",
+      "end_user_name": "Terry McGill",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/SC41hqLTn07QRTEKYBVh",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "sent",
+      "created_at": 1774572013,
+      "updated_at": 1774572013
+    },
+    {
+      "id": "sreq_1rcXXNN0Xn8FVGoOCMj0KK",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24266,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 24911,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 955709,
+          "number": "#955709",
+          "type": "connectwise_psa/project_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "donnawilliamson@beck-technology.com",
+      "end_user_name": "Donna Williamson",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774556198,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/85zdjiIYaqPUqzlmRiYI",
+      "selected_start_time": 1774619100,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774555912,
+      "updated_at": 1774556198
+    },
+    {
+      "id": "sreq_2NLTUeogozfLagLrgS9FlZ",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24237,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 55953,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964532,
+          "number": "#964532",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "ccowen@northgate-tx.com",
+      "end_user_name": "Cynthia Cowen",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774535168,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/RvtDkHxDWnKXoxBQim7Z",
+      "selected_start_time": 1774616400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774533269,
+      "updated_at": 1774535168
+    },
+    {
+      "id": "sreq_6VXUGL9tRLL0l0FY85VW22",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_3G5vZaTwuOpmqWcY1BzgCr",
+      "associated_entities": [
+        {
+          "id": 19539,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43797,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964534,
+          "number": "#964534",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 120,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "rstephens@rlnrp.com",
+      "end_user_name": "Rylee Stephens",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774538191,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/mM72pz3CMLGvV8PzIO8I",
+      "selected_start_time": 1774636200,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774533212,
+      "updated_at": 1774538191
+    },
+    {
+      "id": "sreq_31iwQLboqAHroWxEEXAROZ",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21961,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54646,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963735,
+          "number": "#963735",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "austin@castroroofing.com",
+      "end_user_name": "Austin Jordan",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774532587,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/iao3ddjyIOMwWlmCZ6hb",
+      "selected_start_time": 1774630800,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774480484,
+      "updated_at": 1774532587
+    },
+    {
+      "id": "sreq_3LqOyI86iAFTXT0wJxYCiD",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 19335,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 21384,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963804,
+          "number": "#963804",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "victoria@rexrealestate.com",
+      "end_user_name": "Victoria Trout",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/zsFWSYRMAPoAX4RSHNzE",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "new",
+      "created_at": 1774474402,
+      "updated_at": 1774474402
+    },
+    {
+      "id": "sreq_2oIAahIAysQkknSOZfsx2T",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_1GxGrh8jONa2uOZSmEDNHs",
+      "associated_entities": [],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "sung@statuspros.net",
+      "end_user_name": "Sung Ahn",
+      "guests_list": [
+        "lucas@statuspros.net"
+      ],
+      "resources": [
+        {
+          "id": "agnt_4I974HQTjGaFESuUVt7H5Q",
+          "name": "Shana Arevalo",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4I974HQTjGaFESuUVt7H5Q",
+          "name": "Shana Arevalo",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774473229,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/laE2DdMn6UOqNbe3GiVM",
+      "selected_start_time": 1775147400,
+      "selected_time_zone": "Pacific Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774473224,
+      "updated_at": 1774473229
+    },
+    {
+      "id": "sreq_4jvHXsqR7sIRXQAOK09zWw",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21961,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54650,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963827,
+          "number": "#963827",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "debra@castroroofing.com",
+      "end_user_name": "Debra Jordan",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774463836,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/fYdpupbbaefshfBfVkbL",
+      "selected_start_time": 1775487600,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774452601,
+      "updated_at": 1774463836
+    },
+    {
+      "id": "sreq_7EA3rUyRAUrV5baOTa5HeZ",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 19301,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 323,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964400,
+          "number": "#964400",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "abutterworth@integrissolutions.com",
+      "end_user_name": "Ashley Butterworth",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774386941,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/HettQ5cSdMZZ54m8FgWv",
+      "selected_start_time": 1774551600,
+      "selected_time_zone": "Arizona",
+      "status": "scheduled",
+      "created_at": 1774386243,
+      "updated_at": 1774386941
+    },
+    {
+      "id": "sreq_6v05Nd0Vdzmnk11fgaR2O5",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 19315,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 55951,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964260,
+          "number": "#964260",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "genesis@texoassociation.org",
+      "end_user_name": "Genesis Chavez",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774360941,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/JLAm2uwDsesUbbEqvjMQ",
+      "selected_start_time": 1774445400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774360744,
+      "updated_at": 1774360941
+    },
+    {
+      "id": "sreq_2j3D34fMuqfIV14JtVTdJY",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21961,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54655,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964258,
+          "number": "#964258",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "josh@castroroofing.com",
+      "end_user_name": "Josh Evans",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774305301,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/tiAQ8s9rXPMxFYGzOe6L",
+      "selected_start_time": 1774382400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774300496,
+      "updated_at": 1774305301
+    },
+    {
+      "id": "sreq_1a9vdrTx4PdPW947H7l7z7",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21961,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54646,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964258,
+          "number": "#964258",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "austin@castroroofing.com",
+      "end_user_name": "Austin Jordan",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/Y6AihHgrb5dBX2nJ7VMF",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "cancelled",
+      "created_at": 1774300444,
+      "updated_at": 1774300480
+    },
+    {
+      "id": "sreq_kbKm2TzOaocOstWuYDdRW",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 21961,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54646,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964258,
+          "number": "#964258",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "austin@castroroofing.com",
+      "end_user_name": "Austin Jordan",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/lMk0qugL6eXb6tdaXsh9",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "cancelled",
+      "created_at": 1774300386,
+      "updated_at": 1774300403
+    },
+    {
+      "id": "sreq_suusf8VQBFWRMxx07M0Fj",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24266,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 55944,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963853,
+          "number": "#963853",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "tonyxu@beck-technology.com",
+      "end_user_name": "Tony Xu",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774283657,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/G1OQL6nhOuTqcMCEWo14",
+      "selected_start_time": 1774364400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774278534,
+      "updated_at": 1774283657
+    },
+    {
+      "id": "sreq_jSfrJWRKswVdSgAUomeoA",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24240,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 45793,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 962799,
+          "number": "#962799",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "melissa@governmentresource.com",
+      "end_user_name": "Melissa Valentine",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774292343,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/386s9O6RCy7obJj8FprU",
+      "selected_start_time": 1774367100,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774275963,
+      "updated_at": 1774292343
+    },
+    {
+      "id": "sreq_3f6BTUmnAeDeVo9s1c0Tjy",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 19329,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 22176,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 964070,
+          "number": "#964070",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "sellerbrock@albinoldnerlaw.com",
+      "end_user_name": "Susan Ellerbrock",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1774043733,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/2nfSihlVPcQJhX4pW5lt",
+      "selected_start_time": 1774272600,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1774043527,
+      "updated_at": 1774043733
+    },
+    {
+      "id": "sreq_HqSqDxO7WPFjdf0G58IlW",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_GeudoH11AFFPG5QTnefsa",
+      "associated_entities": [
+        {
+          "id": 24318,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 25634,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 962173,
+          "number": "#962173",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "jbishop@duraplasinc.com",
+      "end_user_name": "John Bishop",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_5glPwqIosa3vqiR9O60veC",
+          "name": "Jason Skidmore",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/4f7K4GauM3A71hS4zws2",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "cancelled",
+      "created_at": 1774021237,
+      "updated_at": 1774021373
+    },
+    {
+      "id": "sreq_6lqsGPdpsyTVFTqJawNsVe",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 24266,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 55944,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963853,
+          "number": "#963853",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "tonyxu@beck-technology.com",
+      "end_user_name": "Tony Xu",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773950240,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/1PLIRApG5kE0jz3vZGCd",
+      "selected_start_time": 1774028700,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773950119,
+      "updated_at": 1773950240
+    },
+    {
+      "id": "sreq_cwE16jkq55qIBWI4c78PF",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24240,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 45797,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963440,
+          "number": "#963440",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "mmowery@governmentresource.com",
+      "end_user_name": "Mike Mowery",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773863968,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/vMuw4BrR8RrFO5ICP8Xz",
+      "selected_start_time": 1774292400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773863716,
+      "updated_at": 1773863968
+    },
+    {
+      "id": "sreq_3AhZ3rvMpHARshcgXUbfsZ",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_1GxGrh8jONa2uOZSmEDNHs",
+      "associated_entities": [],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "loganb@climbcs.com",
+      "end_user_name": "Logan Breitenbach",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4I974HQTjGaFESuUVt7H5Q",
+          "name": "Shana Arevalo",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4I974HQTjGaFESuUVt7H5Q",
+          "name": "Shana Arevalo",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773803033,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/2xRe8vkHBUpG8aUHNhqp",
+      "selected_start_time": 1774546200,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773803027,
+      "updated_at": 1773803033
+    },
+    {
+      "id": "sreq_2FauNTlNxazIg430Is8e94",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_3G5vZaTwuOpmqWcY1BzgCr",
+      "associated_entities": [
+        {
+          "id": 19539,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43797,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963581,
+          "number": "#963581",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 120,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "rstephens@rlnrp.com",
+      "end_user_name": "Rylee Stephens",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773787215,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/Db6zmxXBRMYmHkfdURrm",
+      "selected_start_time": 1773932400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773786983,
+      "updated_at": 1773787215
+    },
+    {
+      "id": "sreq_4605bQcW1tq4MwzIAZqx8i",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24240,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 45793,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 962799,
+          "number": "#962799",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "melissa@governmentresource.com",
+      "end_user_name": "Melissa Valentine",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773786226,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/fCno1Nmo02fRwnhf8giT",
+      "selected_start_time": 1773922500,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773784805,
+      "updated_at": 1773786226
+    },
+    {
+      "id": "sreq_3r5S6FvldfeoWARRZ6Ukn9",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 51443,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963569,
+          "number": "#963569",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "bbrady@hba-designbuild.com",
+      "end_user_name": "Bryan Brady",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773785874,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/Kyh8pAhjFnmnbG3C9rbo",
+      "selected_start_time": 1773864000,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773783672,
+      "updated_at": 1773785874
+    },
+    {
+      "id": "sreq_5EzURjvC5Nk1u0BVjd4SXB",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43674,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963568,
+          "number": "#963568",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "caydt@hba-designbuild.com",
+      "end_user_name": "Caitlin Aydt",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773786777,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/yvFMI5N31e60Yb3XSQBz",
+      "selected_start_time": 1773926100,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773783233,
+      "updated_at": 1773786777
+    },
+    {
+      "id": "sreq_3LWSjn5smW6tKIVrrbsNfW",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43671,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963567,
+          "number": "#963567",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "acandy@hba-designbuild.com",
+      "end_user_name": "Austin Candy",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773785076,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/SwpzHUOqtTn9z3Pr4me2",
+      "selected_start_time": 1774636200,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773783118,
+      "updated_at": 1773785076
+    },
+    {
+      "id": "sreq_7I4VoYEU8DjjOLkIfCYqff",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43683,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963565,
+          "number": "#963565",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "mladd@hba-designbuild.com",
+      "end_user_name": "Mark Ladd",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_6UdOkBaUf6ssTt3ttCc4NA",
+          "name": "Aaron Stowe",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773845864,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/lnfOUQx3dM1Z2vikLMze",
+      "selected_start_time": 1774012500,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773781989,
+      "updated_at": 1773845864
+    },
+    {
+      "id": "sreq_342pBw6fk0UOAjDE9UgT5n",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43673,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963564,
+          "number": "#963564",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "bruce@hba-designbuild.com",
+      "end_user_name": "Bruce Barclay",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/YLjcIKnQ1JlJVFBhB7Xw",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "new",
+      "created_at": 1773781165,
+      "updated_at": 1773781165
+    },
+    {
+      "id": "sreq_618JtbhEadUuFItYH7sPuv",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24385,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 43478,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963563,
+          "number": "#963563",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "abarnard@hba-designbuild.com",
+      "end_user_name": "Ann Barnard",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "team_5tkzvGWnFu3XNk7ry9XU6z",
+          "name": "MSP Red Team",
+          "object": "team"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773781371,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/eNQ5nUypTXbCspofgmlB",
+      "selected_start_time": 1774541700,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773780481,
+      "updated_at": 1773781371
+    },
+    {
+      "id": "sreq_EtT9KX2vWvSuELsm3QX5b",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_61wD2QcMYFCTniVkQH77Jb",
+      "associated_entities": [
+        {
+          "id": 24240,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 45797,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 963440,
+          "number": "#963440",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 60,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "mmowery@governmentresource.com",
+      "end_user_name": "Mike Mowery",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_4SbWBgSBoDE2RmnZJwbspr",
+          "name": "Isam Hashim",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773759515,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/NJkulrEs4pZZFNdE08js",
+      "selected_start_time": 1773862200,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773758925,
+      "updated_at": 1773759515
+    },
+    {
+      "id": "sreq_2p9BSWFdEog5tmr9ekSXR9",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_6aU73FoQwsd63Bc5vCRP9E",
+      "associated_entities": [
+        {
+          "id": 19332,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 54005,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 962964,
+          "number": "#962964",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 30,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "christian.holt@goldmedalpools.com",
+      "end_user_name": "Christian Holt",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_1MGrblL1q61hmb5wY28axC",
+          "name": "Scout Kalra",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [],
+      "scheduled_at": null,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/J3XqnsXeuwE9AWbuNhJk",
+      "selected_start_time": null,
+      "selected_time_zone": null,
+      "status": "sent",
+      "created_at": 1773693461,
+      "updated_at": 1773693512
+    },
+    {
+      "id": "sreq_2NyzKuersCbe9OyYv8vUuF",
+      "object": "scheduling_request",
+      "appointment_type_id": "apty_8iehurHu2L8JStxHAN2Fz",
+      "associated_entities": [
+        {
+          "id": 19301,
+          "type": "connectwise_psa/company"
+        },
+        {
+          "id": 289,
+          "type": "connectwise_psa/contact"
+        },
+        {
+          "id": 962982,
+          "number": "#962982",
+          "type": "connectwise_psa/service_ticket"
+        }
+      ],
+      "duration_mins": 15,
+      "earliest_date": null,
+      "earliest_time": null,
+      "latest_date": null,
+      "latest_time": null,
+      "end_user_email": "mthomas@integrissolutions.com",
+      "end_user_name": "Michae Thomas",
+      "guests_list": [],
+      "resources": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_agents": [
+        {
+          "id": "agnt_5VSTBvp8m7EV8f4dgHB5J5",
+          "name": "Zack Venable",
+          "object": "agent"
+        }
+      ],
+      "scheduled_at": 1773758982,
+      "scheduling_url": "https://pegasustechsolutions.timezest.com/schedule/Yy8iKi41Bpp2R17c9Ca9",
+      "selected_start_time": 1773779400,
+      "selected_time_zone": "Central Time (US & Canada)",
+      "status": "scheduled",
+      "created_at": 1773691680,
+      "updated_at": 1773758982
+    }
+  ]
+}

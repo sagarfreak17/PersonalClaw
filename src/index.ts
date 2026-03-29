@@ -484,11 +484,15 @@ io.on('connection', (socket) => {
         finalPrompt = `[DASHBOARD_IMAGE_UPLOAD] User attached a screenshot saved to "${filePath}".\n\nUser Message: ${text}`;
       }
 
-      const response = await conversationManager.send(conversationId, finalPrompt);
+      // Stream AI response tokens to the dashboard in real-time
+      const onStreamChunk = (chunk: string) => {
+        io.emit('response:stream', { conversationId, chunk });
+      };
+
+      const response = await conversationManager.send(conversationId, finalPrompt, onStreamChunk);
       console.log(`[Server] Response ready for ${conversationId} (${response.length} chars), connected sockets: ${io.engine.clientsCount}`);
 
-      // Broadcast to ALL connected clients — the original socket may have disconnected
-      // while the AI was thinking (mobile app backgrounded, socket killed by Android)
+      // Broadcast final complete response to ALL connected clients
       io.emit('response', { conversationId, text: response });
 
       // Always send push notification so the user gets it even if backgrounded

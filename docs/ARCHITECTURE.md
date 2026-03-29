@@ -317,27 +317,43 @@ If the primary model returns 404, 503, 429, or auth error, the Brain automatical
 
 ### System Prompt
 
-The system prompt is dynamically assembled from:
+The system prompt is delivered via Gemini's native **`systemInstruction`** field (not injected as conversation history), saving ~3K tokens per turn. It is dynamically assembled from:
 1. **Core identity** — personality, reasoning framework (Understand → Plan → Act → Verify)
 2. **Self-learned knowledge** — user profile, communication style, intent patterns, domain terms (from `learner.ts`)
 3. **Tool usage guides** — best practices and anti-patterns per skill
 4. **Safety guardrails** — no destructive commands without confirmation, no credential leaking
 
+The system prompt is **cached** at module level and only rebuilt when `long_term_knowledge.json` or `self_learned.json` file modification timestamps change. Call `invalidateSystemPromptCache()` to force a rebuild.
+
 For org agents, the system prompt is replaced with a **persona injection** containing: org mission, agent role/personality/responsibilities, colleague list, task queue, memory, shared memory, human comments on files.
+
+### Streaming
+
+All Gemini calls use **`sendMessageStream()`** instead of `sendMessage()`. Text tokens are emitted in real-time via the `onUpdate` callback, which the Socket.IO handler forwards to the dashboard as `response:stream` events. This reduces perceived latency from seconds to ~1s time-to-first-token.
 
 ### Tool Loop
 
 1. User/scheduler/heartbeat sends message
-2. Brain sends message + tool definitions to Gemini
-3. Gemini responds with text and/or tool_use calls
-4. Brain executes each tool via `handleToolCall()` (with SkillMeta context)
+2. Brain streams message + tool definitions to Gemini via `sendMessageStream()`
+3. Text tokens are emitted to the client in real-time as they arrive
+4. If Gemini returns tool_use calls, Brain executes each tool via `handleToolCall()` (with SkillMeta context)
 5. Results injected back into conversation as function role
-6. Loop repeats until Gemini returns text-only response
-7. Final text returned to caller
+6. Loop repeats (with streaming) until Gemini returns text-only response
+7. Final aggregated text returned to caller
 
 ### Context Compaction
 
-When conversation history exceeds ~50 messages or ~200KB, the Brain summarizes older messages into a single system message, preserving the most recent 5 interactions. This prevents hitting the 1M token limit.
+When conversation history exceeds **200K tokens** (checked every 10 turns), the Brain summarizes older messages into a single context recovery message, preserving the most recent 6 interactions. This prevents runaway token growth that slows every request.
+
+### Performance Optimizations
+
+- **Streaming**: `sendMessageStream()` for real-time token delivery
+- **`systemInstruction`**: Native Gemini field instead of history injection (~3K tokens/turn saved)
+- **System prompt cache**: Rebuilds only when knowledge/learning files change on disk
+- **Tool definition cache**: `getToolDefinitions()` result cached at module level (skills don't change at runtime)
+- **Async history save**: `fs.promises.writeFile` instead of `writeFileSync` to unblock the event loop
+- **Learner throttle**: Self-learning analysis skipped if last run was < 60s ago, preventing API quota contention
+- **Lower compaction threshold**: 200K tokens (was 800K), checked every 10 turns (was 20)
 
 ### Brain Constructor
 

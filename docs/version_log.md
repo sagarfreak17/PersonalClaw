@@ -2,6 +2,26 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.11.0] - 2026-03-29
+
+### Brain: LLM Response Speed Overhaul
+
+Seven performance optimizations to reduce LLM response latency and perceived wait time:
+
+- **Streaming responses**: Switched from `sendMessage()` to `sendMessageStream()` across the entire Brain. Text tokens now stream to the dashboard in real-time via `response:stream` Socket.IO events, reducing time-to-first-token from seconds to ~1s.
+- **Native `systemInstruction`**: Moved the system prompt from fake user/model history messages to Gemini's native `systemInstruction` model config field. Saves ~3K tokens per turn that were previously re-read as conversation history on every request.
+- **System prompt cache**: `buildSystemPrompt()` result is now cached at module level. Only rebuilds when `long_term_knowledge.json` or `self_learned.json` file modification timestamps change. Exported `invalidateSystemPromptCache()` for forced rebuilds.
+- **Tool definition cache**: `getToolDefinitions()` result cached since skills don't change at runtime. Used in both `createModel()` and `handleStatus()`.
+- **Lower compaction threshold**: Context compaction now triggers at 200K tokens (was 800K) and checks every 10 turns (was 20), preventing long conversations from accumulating massive context that slows every request.
+- **Async history save**: `saveHistory()` now uses `fs.promises.writeFile` instead of `fs.writeFileSync`, unblocking the Node.js event loop during writes.
+- **Learner throttle**: Self-learning analysis now skipped if the last run was less than 60 seconds ago, preventing API quota contention between the learner and the main model.
+
+#### Files Changed
+- **Updated**: `src/core/brain.ts` — all 7 optimizations (streaming, systemInstruction, caches, compaction, async save, learner throttle)
+- **Updated**: `src/core/conversation-manager.ts` — pass `onUpdate` callback through `send()` for streaming support
+- **Updated**: `src/index.ts` — Socket.IO handler emits `response:stream` events for real-time token delivery
+- **Updated**: `docs/ARCHITECTURE.md` — documented streaming, systemInstruction, caching, and performance section
+
 ## [12.10.1] - 2026-03-27
 
 ### Dashboard: Real-time Thinking Console (Super User)

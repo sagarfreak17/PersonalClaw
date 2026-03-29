@@ -18,6 +18,45 @@ const KNOWLEDGE_FILE = path.join(MEMORY_DIR, 'long_term_knowledge.json');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+// ─── Cached Tool Definitions (skills don't change at runtime) ──────
+let _cachedToolDefs: any[] | null = null;
+function getCachedToolDefinitions(): any[] {
+  if (!_cachedToolDefs) {
+    _cachedToolDefs = getToolDefinitions();
+  }
+  return _cachedToolDefs;
+}
+
+// ─── System Prompt Cache ───────────────────────────────────────────
+let _cachedSystemPrompt: string | null = null;
+let _systemPromptKnowledgeMtime: number = 0;
+let _systemPromptLearnMtime: number = 0;
+
+function getCachedSystemPrompt(): string {
+  // Check if knowledge or learnings files changed
+  let knowledgeMtime = 0;
+  let learnMtime = 0;
+  try {
+    if (fs.existsSync(KNOWLEDGE_FILE)) knowledgeMtime = fs.statSync(KNOWLEDGE_FILE).mtimeMs;
+  } catch { /* ignore */ }
+  try {
+    const learnFile = path.join(MEMORY_DIR, 'self_learned.json');
+    if (fs.existsSync(learnFile)) learnMtime = fs.statSync(learnFile).mtimeMs;
+  } catch { /* ignore */ }
+
+  if (!_cachedSystemPrompt || knowledgeMtime !== _systemPromptKnowledgeMtime || learnMtime !== _systemPromptLearnMtime) {
+    _cachedSystemPrompt = buildSystemPrompt();
+    _systemPromptKnowledgeMtime = knowledgeMtime;
+    _systemPromptLearnMtime = learnMtime;
+  }
+  return _cachedSystemPrompt;
+}
+
+/** Force rebuild on next access (called after learner updates). */
+export function invalidateSystemPromptCache(): void {
+  _cachedSystemPrompt = null;
+}
+
 // ─── Model Registry & Failover ──────────────────────────────────────
 interface ModelInfo {
   id: string;
@@ -347,6 +386,9 @@ export class Brain {
   private extraSkills: Skill[] = [];
   private toolFilter: ((name: string) => boolean) | null = null;
 
+  // Learner throttle
+  private _lastLearnerRun: number = 0;
+
   constructor(config?: BrainConfig) {
     // Support legacy no-arg construction
     const cfg = config ?? { agentId: 'legacy_default', conversationId: 'legacy_default' };
@@ -408,7 +450,7 @@ export class Brain {
 
   private createModel(modelId: string): GenerativeModel {
     // Workers never get spawn_agent
-    let toolDefs = getToolDefinitions();
+    let toolDefs = getCachedToolDefinitions();
     if (this.isWorker) {
       toolDefs = toolDefs.filter((t: any) => {
         const name = t.functionDeclarations[0].name;
@@ -440,8 +482,12 @@ export class Brain {
       tools.push({ googleSearch: {} } as any);
     }
 
+    // Use native systemInstruction — saves ~3K tokens/turn vs history injection
+    const systemPrompt = this.config.systemPromptOverride ?? getCachedSystemPrompt();
+
     const modelConfig: any = {
       model: modelId,
+      systemInstruction: systemPrompt,
       tools: tools as any,
     };
 
@@ -489,12 +535,12 @@ export class Brain {
    * Update the system prompt override without resetting conversation history.
    * Used by org-agent-runner to refresh latest memory/tickets between chat messages
    * while preserving the full conversation context (FIX-I).
+   * Now rebuilds the model with new systemInstruction instead of modifying history.
    */
   updateSystemPromptOverride(newPrompt: string): void {
-    if (this.history.length >= 1) {
-      this.history[0] = { role: 'user', parts: [{ text: newPrompt }] };
-      this.chat = this.model.startChat({ history: this.history });
-    }
+    this.config.systemPromptOverride = newPrompt;
+    this.model = this.createModel(this.activeModelId);
+    this.chat = this.model.startChat({ history: this.history });
   }
 
   // ─── Getters for external access ──────────────────────────────────
@@ -543,16 +589,32 @@ export class Brain {
   }
 
   /**
-   * Send a message with automatic model failover on critical errors.
+   * Send a message with streaming + automatic model failover on critical errors.
+   * When onStreamChunk is provided, text tokens are emitted in real-time.
    */
-  private async sendWithFailover(payload: any): Promise<any> {
+  private async sendWithFailover(payload: any, onStreamChunk?: (text: string) => void): Promise<any> {
     let lastError = '';
     const startModelId = this.activeModelId;
 
     for (let attempt = 0; attempt < this.failoverChain.length; attempt++) {
       try {
-        const result = await this.chat.sendMessage(payload);
-        return result;
+        // Use streaming for real-time token delivery
+        const streamResult = await this.chat.sendMessageStream(payload);
+        let fullResponse: any = null;
+
+        // If caller wants streaming, emit chunks as they arrive
+        if (onStreamChunk) {
+          for await (const chunk of streamResult.stream) {
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (part.text) onStreamChunk(part.text);
+            }
+          }
+        }
+
+        // Always await the full aggregated response for tool call detection
+        fullResponse = await streamResult.response;
+        return { response: fullResponse };
       } catch (e: any) {
         lastError = e.message || String(e);
 
@@ -604,12 +666,10 @@ export class Brain {
   }
 
   private initSession() {
-    // Org agents pass a full persona-injected prompt via systemPromptOverride
-    let systemPrompt = this.config.systemPromptOverride ?? buildSystemPrompt();
-
-    // Worker system prompt guardrail — only applied when no override is provided
+    // Worker system prompt guardrail — appended to systemInstruction via override
     if (this.isWorker && !this.config.systemPromptOverride) {
-      systemPrompt += `\n\n---\n\nWORKER AGENT CONSTRAINTS:
+      const base = getCachedSystemPrompt();
+      this.config.systemPromptOverride = base + `\n\n---\n\nWORKER AGENT CONSTRAINTS:
 You are a sub-agent worker. Complete your assigned task and return the result.
 
 You must NOT:
@@ -623,10 +683,12 @@ If your task requires any of the above, return an explanation of what you would
 need to do and ask the parent conversation to confirm before acting.`;
     }
 
-    this.history = [
-      { role: 'user', parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Online. PersonalClaw v11 is ready. What do you need?' }] },
-    ];
+    // System prompt now lives in systemInstruction (model config), not history
+    // Rebuild model only if override changed (e.g. worker guardrail was just set)
+    if (this.isWorker || this.config.systemPromptOverride) {
+      this.model = this.createModel(this.activeModelId);
+    }
+    this.history = [];
     this.turnCount = 0;
     this.startNewSession(this.history);
   }
@@ -640,7 +702,10 @@ need to do and ask the parent conversation to confirm before acting.`;
         fs.mkdirSync(dir, { recursive: true });
       }
       const filePath = path.join(dir, `${this.sessionId}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(this.history, null, 2));
+      // Async write to avoid blocking the event loop
+      fs.promises.writeFile(filePath, JSON.stringify(this.history, null, 2)).catch(e => {
+        console.error('[Brain] Failed to save history:', e);
+      });
     } catch (e) {
       console.error('[Brain] Failed to save history:', e);
     }
@@ -689,20 +754,18 @@ need to do and ask the parent conversation to confirm before acting.`;
       const tokenResult = await this.model.countTokens({ contents: history });
       const totalTokens = tokenResult.totalTokens;
 
-      if (totalTokens > 800_000) {
-        console.log(`[Brain] Token count (${totalTokens}) exceeds threshold. Auto-compacting...`);
+      if (totalTokens > 200_000) {
+        console.log(`[Brain] Token count (${totalTokens}) exceeds 200K threshold. Auto-compacting...`);
 
         const summaryResult = await this.model.generateContent(
-          `Summarize the following conversation history into a concise context block. Preserve: all user preferences, established workflows, active tasks, and any important decisions. Drop: tool call/response details, redundant exchanges, and small talk.\n\nHistory:\n${JSON.stringify(history.slice(2, -6), null, 2)}`
+          `Summarize the following conversation history into a concise context block. Preserve: all user preferences, established workflows, active tasks, and any important decisions. Drop: tool call/response details, redundant exchanges, and small talk.\n\nHistory:\n${JSON.stringify(history.slice(0, -6), null, 2)}`
         );
         const summary = summaryResult.response.text();
 
-        const systemPrompt = buildSystemPrompt();
         const recentHistory = history.slice(-6);
 
+        // System prompt is in systemInstruction, not history — just inject summary + recent
         this.history = [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          { role: 'model', parts: [{ text: 'Online. PersonalClaw v11 is ready. What do you need?' }] },
           { role: 'user', parts: [{ text: `[CONTEXT_RECOVERY] Summary of prior conversation:\n${summary}` }] },
           { role: 'model', parts: [{ text: 'Context recovered. Continuing where we left off.' }] },
           ...recentHistory,
@@ -791,7 +854,7 @@ need to do and ask the parent conversation to confirm before acting.`;
       const tokenResult = await this.model.countTokens({ contents: history });
       const tokens = tokenResult.totalTokens;
       const pct = ((tokens / 1_000_000) * 100).toFixed(1);
-      const toolNames = getToolDefinitions().map((t: any) => t.functionDeclarations[0].name);
+      const toolNames = getCachedToolDefinitions().map((t: any) => t.functionDeclarations[0].name);
 
       const uptimeMs = Date.now() - this.sessionStartTime;
       const uptimeMin = Math.floor(uptimeMs / 60000);
@@ -1354,19 +1417,22 @@ need to do and ask the parent conversation to confirm before acting.`;
     const requestStartTime = Date.now();
     let toolCallsThisRequest = 0;
 
-    // Auto-compact check every 20 turns
-    if (this.turnCount % 20 === 0) {
+    // Auto-compact check every 10 turns
+    if (this.turnCount % 10 === 0) {
       await this.compactHistoryIfNeeded();
     }
 
-    let result = await this.sendWithFailover(message);
+    // Stream text tokens to the UI in real-time via onUpdate
+    const streamChunkHandler = onUpdate ? (text: string) => onUpdate(text) : undefined;
+
+    let result = await this.sendWithFailover(message, streamChunkHandler);
     let response = result.response;
 
     // Notify if we failed over during initial send
     if (this.activeModelId !== this.failoverChain[0] && this.turnCount === 1) {
       if (onUpdate) {
         const info = MODEL_REGISTRY.find(m => m.id === this.activeModelId);
-        onUpdate(`Primary model unavailable. Using **${info?.name || this.activeModelId}** (failover).`);
+        onUpdate(`\n\n_Primary model unavailable. Using **${info?.name || this.activeModelId}** (failover)._`);
       }
     }
 
@@ -1478,7 +1544,8 @@ need to do and ask the parent conversation to confirm before acting.`;
 
       toolResults.push(...parallelResults, ...sequentialResults);
 
-      result = await this.sendWithFailover(toolResults);
+      // Stream tool-result responses too — the model may produce final text after tool calls
+      result = await this.sendWithFailover(toolResults, streamChunkHandler);
       response = result.response;
     }
 
@@ -1489,7 +1556,7 @@ need to do and ask the parent conversation to confirm before acting.`;
       .map((part: any) => part.text)
       .join('\n');
 
-    // Save updated history
+    // Save updated history (async — non-blocking)
     this.history = await this.chat.getHistory();
     this.saveHistory();
 
@@ -1513,15 +1580,22 @@ need to do and ask the parent conversation to confirm before acting.`;
 
     // Queue conversation for background self-learning analysis
     // FIX-J: also skip org agent heartbeat runs to prevent polluting personal learning profile
+    // Throttle: skip if last analysis was < 60s ago
     if (
       !message.startsWith('[INTERNAL_SCHEDULER]') &&
       !message.startsWith('[DASHBOARD_IMAGE_UPLOAD]') &&
       !message.startsWith('[HEARTBEAT:')
     ) {
-      this.learner.queueAnalysis(this.history);
+      const now = Date.now();
+      if (!this._lastLearnerRun || now - this._lastLearnerRun > 60_000) {
+        this._lastLearnerRun = now;
+        this.learner.queueAnalysis(this.history);
+      }
     }
 
-    if (onUpdate) onUpdate(finalTexts);
+    // Note: streaming already sent chunks via onUpdate — don't re-send full text
+    // Only call onUpdate with final text if we weren't streaming (no streamChunkHandler)
+    if (onUpdate && !streamChunkHandler) onUpdate(finalTexts);
     return finalTexts || '(No response generated)';
   }
 }

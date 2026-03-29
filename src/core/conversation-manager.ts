@@ -96,10 +96,10 @@ class ConversationManager {
     return messages;
   }
 
-  async send(conversationId: string, message: string): Promise<string> {
+  async send(conversationId: string, message: string, onUpdate?: (chunk: string) => void): Promise<string> {
     const convo = this.get(conversationId);
     convo.lastActivityAt = new Date();
-    return convo.brain.processMessage(message);
+    return convo.brain.processMessage(message, onUpdate);
   }
 
   /**

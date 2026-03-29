@@ -23,6 +23,7 @@ Thumbs.db
 # VS Code / IDE
 .vscode/
 .gemini/
+.smithery
 
 # Browser & Media
 browser_data/
@@ -32,6 +33,11 @@ browser_data/
 test_vision.js
 list_models.js
 check_ssl.ps1
+scripts/testclaude_gps.py
+scripts/TimeZestTest_Claude.py
+scripts/*_exploration_*.json
+scripts/MSP_Corp_CSAT_Feb_2026.json
+scripts/fetch_msp_corp_csat.py
 
 # AI Generated Outputs
 outputs/
@@ -41,3 +47,10 @@ orgs/
 
 # Logs
 logs/
+
+# Chat & Data Exports
+20*anyway-to-make-llm-response-fast*.txt
+csat_data_march_2026.json
+CSAT_Executive_Insights.html
+exports/
+data/

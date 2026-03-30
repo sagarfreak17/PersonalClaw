@@ -16,6 +16,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { memoryIndex } from './memory-index.js';
 
 dotenv.config();
 
@@ -343,6 +344,7 @@ export class Learner {
       }
 
       this.mergeInsights(insights);
+      await this.upsertFactsToIndex(insights);
       console.log('[Learner] ✅ Insights merged successfully.');
     } catch (e: any) {
       // Rate limit or other API error — just skip this analysis
@@ -555,6 +557,65 @@ export class Learner {
       memory.total_conversations_analyzed++;
       saveLearnedMemory(memory);
       console.log(`[Learner] 📚 Updated self-learned memory (${memory.total_conversations_analyzed} conversations analyzed total).`);
+    }
+  }
+
+  /**
+   * Upsert fact-like insights into the vector memory index.
+   * Only extracts discrete facts — structured patterns (shorthand, style, intent)
+   * stay in self_learned.json where they belong.
+   */
+  private async upsertFactsToIndex(insights: any): Promise<void> {
+    try {
+      const facts: Array<{ key: string; value: string }> = [];
+
+      // User profile notes -> facts
+      if (insights.user_profile_updates?.new_notes?.length) {
+        for (const note of insights.user_profile_updates.new_notes) {
+          const noteKey = `user_note_${note.substring(0, 30).replace(/\W+/g, '_').toLowerCase()}`;
+          facts.push({ key: noteKey, value: note });
+        }
+      }
+
+      // Domain knowledge -> facts
+      if (insights.new_domain_knowledge?.length) {
+        for (const dk of insights.new_domain_knowledge) {
+          facts.push({
+            key: `domain_${dk.term.replace(/\W+/g, '_').toLowerCase()}`,
+            value: `${dk.category}: ${dk.meaning}`,
+          });
+        }
+      }
+
+      // Corrections -> facts
+      if (insights.new_corrections?.length) {
+        for (const c of insights.new_corrections) {
+          facts.push({
+            key: `correction_${c.lesson.substring(0, 30).replace(/\W+/g, '_').toLowerCase()}`,
+            value: c.lesson,
+          });
+        }
+      }
+
+      // Raw insights -> facts
+      if (insights.raw_insights?.length) {
+        for (const insight of insights.raw_insights) {
+          facts.push({
+            key: `insight_${insight.substring(0, 30).replace(/\W+/g, '_').toLowerCase()}`,
+            value: insight,
+          });
+        }
+      }
+
+      for (const fact of facts) {
+        await memoryIndex.upsert(fact.key, fact.value, 'learner');
+      }
+
+      if (facts.length > 0) {
+        console.log(`[Learner] Upserted ${facts.length} facts into vector memory index.`);
+      }
+    } catch (err) {
+      console.warn('[Learner] Failed to upsert facts to memory index (non-fatal):', err);
     }
   }
 

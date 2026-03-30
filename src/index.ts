@@ -27,6 +27,7 @@ import { runOrgAgent, isAgentRunning, closeChatSession, abortChatSession, getAll
 import { approveProposal, rejectProposal, loadProposals, resetStaleInProgressTickets, getProposalContent } from './core/org-file-guard.js';
 import { storeNotification, getNotifications, setTelegramSender, sendDailyDigest } from './core/org-notification-store.js';
 import { todoManager } from './core/todo-manager.js';
+import { memoryIndex } from './core/memory-index.js';
 import cron from 'node-cron';
 
 dotenv.config();
@@ -52,6 +53,23 @@ const telegram = new TelegramInterface();
 if (process.env.TELEGRAM_BOT_TOKEN) {
   setTelegramSender(async (msg) => telegram.sendMessage(msg));
 }
+
+// ─── Vector Memory Index Initialization ─────────────────────────────
+(async () => {
+  try {
+    await memoryIndex.load();
+    const vectorFile = path.join(process.cwd(), 'memory', 'vector_index.json');
+    const exists = fs.existsSync(vectorFile);
+    const isEmpty = exists && memoryIndex.getEntryCount() === 0;
+    if (!exists || isEmpty) {
+      console.log('[Startup] Migrating legacy memory to vector index...');
+      await memoryIndex.migrateFromLegacy();
+      console.log('[Startup] Memory migration complete.');
+    }
+  } catch (e) {
+    console.error('[Startup] Memory index initialization failed (non-fatal):', e);
+  }
+})();
 
 // FIX-AF: Reset stale in_progress tickets on startup
 setTimeout(() => resetStaleInProgressTickets(getRunningAgentsSet()), 2000);
@@ -1522,6 +1540,72 @@ app.delete('/api/push/register', (req, res) => {
   const tokens = loadPushTokens().filter(t => t !== token);
   savePushTokens(tokens);
   res.json({ success: true });
+});
+
+// ─── Vector Memory API ──────────────────────────────────────────────
+
+app.get('/api/memory/export', async (_req, res) => {
+  try {
+    const markdown = await memoryIndex.exportMarkdown();
+    res.setHeader('Content-Type', 'text/markdown');
+    res.setHeader('Content-Disposition', 'attachment; filename="personalclaw-memory.md"');
+    res.send(markdown);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/memory/import', async (req, res) => {
+  try {
+    const markdown = req.body?.markdown;
+    if (!markdown) return res.status(400).json({ error: 'Missing markdown body' });
+    const result = await memoryIndex.importMarkdown(markdown);
+    res.json({ success: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/memory/search', async (req, res) => {
+  try {
+    const q = (req.query.q as string) || '';
+    const k = parseInt(req.query.k as string) || 10;
+    if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
+    const results = await memoryIndex.search(q, k);
+    res.json(results.map(r => ({
+      id: r.entry.id,
+      key: r.entry.key,
+      value: r.entry.value,
+      source: r.entry.source,
+      tags: r.entry.tags,
+      vectorScore: Math.round(r.vectorScore * 1000) / 1000,
+      keywordScore: Math.round(r.keywordScore * 1000) / 1000,
+      combinedScore: Math.round(r.combinedScore * 1000) / 1000,
+    })));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/memory/list', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 50;
+    const result = await memoryIndex.list(page, pageSize);
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/memory/:id', async (req, res) => {
+  try {
+    const deleted = await memoryIndex.deleteById(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Entry not found' });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Trigger push for 5 key events

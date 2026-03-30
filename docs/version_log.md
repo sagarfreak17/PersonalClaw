@@ -2,6 +2,72 @@
 
 All notable changes to the PersonalClaw agent will be documented in this file.
 
+## [12.12.1] - 2026-03-30
+
+### Brain & Memory: Gemini 3 Critical Fixes
+
+- **Brain**: Implemented a **Stream-Capture Patch** for Gemini 3 ("Thinking") models. This captures raw chunks to preserve `thoughtSignature` and `thought` fields that the `@google/generative-ai` SDK's aggregation logic typically strips, resolving `400 Bad Request` errors during parallel tool execution.
+- **Brain**: Added **Thought Signature Reconciliation** in the tool-calling loop to ensure all parallel parts in a single turn correctly propagate the required `thought_signature`.
+- **Memory Index**: Switched default embedding model back to `gemini-embedding-001` (Stable) to resolve `404 Not Found` errors caused by the removal of `text-embedding-004` from the `v1beta` API.
+
+---
+
+## [12.12.0] - 2026-03-30
+
+### Vector Memory System
+
+#### New: `src/core/memory-index.ts` — Unified Memory Engine
+- `MemoryIndexManager` class with Gemini `text-embedding-004` embeddings (768-dim)
+- Local JSON index at `memory/vector_index.json` — TypeScript-native, no native binaries
+- Hybrid search: 70% vector (cosine similarity) + 30% keyword (term overlap)
+- `upsert`, `delete`, `deleteById`, `search`, `list`, `isDuplicate`, `exportMarkdown`, `importMarkdown` methods
+- `IMemoryIndexManager` interface for future backend swaps (SQLite-vec, etc.)
+- Atomic writes (tmp → rename) consistent with todos.json pattern
+- New `memory_index` ReadWriteLock in skill-lock.ts (10s timeout)
+- Sources tracked per entry: `manual` | `learner` | `compaction_flush`
+- Query embedding cache (5min TTL) — avoids repeated API calls for system prompt rebuilds
+- `batchEmbedContents` for migration — falls back to sequential on failure
+- Deduplication check (`isDuplicate`) at >0.9 cosine similarity threshold
+
+#### Changed: `src/skills/memory.ts`
+- `manage_long_term_memory` now routes to vector memory index
+- `recall` is now semantic search — "what do I know about ConnectWise" works
+- New actions: `search` (explicit semantic), `recall_exact` (exact key match), `list` (paginated)
+- Updated AI-facing skill description with usage guidance
+- Backwards compatible — existing `learn`/`recall`/`forget` calls work unchanged
+
+#### Changed: `src/core/learner.ts`
+- New `upsertFactsToIndex()` method — discrete facts (profile notes, domain knowledge, corrections, raw insights) written to vector index with `source: 'learner'`
+- Structured patterns (shorthand maps, intent patterns, style analysis) remain in `self_learned.json` where they belong — not flattened into key-value pairs
+
+#### Changed: `src/core/brain.ts`
+- `flushToMemory()` — pre-compaction fact extraction using `gemini-2.5-flash`
+- Fires before every context compaction (200K token threshold)
+- Dedup check before upsert — skips facts with >0.9 cosine similarity to existing entries
+- New `buildVectorMemoryBlock()` — injects top 20 most recent facts into system prompt (no API call, reads from disk by `updatedAt`)
+- `Learner.buildContextBlock()` retained as separate section for structured patterns
+- System prompt cache now also watches `vector_index.json` mtime
+
+#### Changed: `src/index.ts`
+- One-time migration on startup: legacy `long_term_knowledge.json` + `self_learned.json` → vector index
+- New endpoints: `GET /api/memory/export`, `POST /api/memory/import`, `GET /api/memory/search`, `GET /api/memory/list`, `DELETE /api/memory/:id`
+
+#### Changed: `src/core/skill-lock.ts`
+- Added `memory_index` to `ReadWriteLockKey` type union (10s timeout)
+
+#### Human Correction Surface
+- Export memory as human-readable Markdown → edit wrong facts → import corrections back
+- Re-embeds only changed entries on import
+- No runtime sync complexity — manual on-demand workflow
+
+#### Architecture Decisions
+- Vector index is the **fact store**; learner's `self_learned.json` is the **pattern store** — they coexist
+- System prompt gets both: structured patterns (shorthand, style) + recent facts (top 20 by date)
+- Migration uses `batchEmbedContents` to avoid 350+ sequential API calls
+- JSON index is fine for <5K entries; future versions can swap to SQLite-vec via the `IMemoryIndexManager` interface
+
+---
+
 ## [12.11.2] - 2026-03-29
 
 ### Dashboard: Modernized Sidebar & Dark Theme Fixes

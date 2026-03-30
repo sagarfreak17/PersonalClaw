@@ -12,7 +12,7 @@
 import { eventBus } from './events.js';
 
 export type ExclusiveLockKey = 'browser_vision' | 'clipboard' | 'desktop';
-export type ReadWriteLockKey = 'memory' | 'scheduler' | 'todos' | `files:${string}`;
+export type ReadWriteLockKey = 'memory' | 'memory_index' | 'scheduler' | 'todos' | `files:${string}`;
 export type AnyLockKey = ExclusiveLockKey | ReadWriteLockKey;
 
 export interface LockHolder {
@@ -35,6 +35,7 @@ const LOCK_TIMEOUTS: Record<string, number> = {
   clipboard: 5_000,
   desktop: 30_000,
   memory: 5_000,
+  memory_index: 10_000,
   scheduler: 5_000,
   todos: 5_000,
   files: 10_000,

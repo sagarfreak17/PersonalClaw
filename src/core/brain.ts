@@ -7,6 +7,7 @@ import { chromeNativeAdapter, ChromeNativeAdapter } from './chrome-mcp.js';
 import { browserManager } from './browser.js';
 import { extensionRelay } from './relay.js';
 import { Learner } from './learner.js';
+import { memoryIndex } from './memory-index.js';
 import { eventBus, Events } from './events.js';
 import { audit } from './audit.js';
 import { SessionManager } from './sessions.js';
@@ -31,11 +32,13 @@ function getCachedToolDefinitions(): any[] {
 let _cachedSystemPrompt: string | null = null;
 let _systemPromptKnowledgeMtime: number = 0;
 let _systemPromptLearnMtime: number = 0;
+let _systemPromptVectorMtime: number = 0;
 
 function getCachedSystemPrompt(): string {
-  // Check if knowledge or learnings files changed
+  // Check if knowledge, learnings, or vector index files changed
   let knowledgeMtime = 0;
   let learnMtime = 0;
+  let vectorMtime = 0;
   try {
     if (fs.existsSync(KNOWLEDGE_FILE)) knowledgeMtime = fs.statSync(KNOWLEDGE_FILE).mtimeMs;
   } catch { /* ignore */ }
@@ -43,11 +46,19 @@ function getCachedSystemPrompt(): string {
     const learnFile = path.join(MEMORY_DIR, 'self_learned.json');
     if (fs.existsSync(learnFile)) learnMtime = fs.statSync(learnFile).mtimeMs;
   } catch { /* ignore */ }
+  try {
+    const vectorFile = path.join(MEMORY_DIR, 'vector_index.json');
+    if (fs.existsSync(vectorFile)) vectorMtime = fs.statSync(vectorFile).mtimeMs;
+  } catch { /* ignore */ }
 
-  if (!_cachedSystemPrompt || knowledgeMtime !== _systemPromptKnowledgeMtime || learnMtime !== _systemPromptLearnMtime) {
+  if (!_cachedSystemPrompt
+    || knowledgeMtime !== _systemPromptKnowledgeMtime
+    || learnMtime !== _systemPromptLearnMtime
+    || vectorMtime !== _systemPromptVectorMtime) {
     _cachedSystemPrompt = buildSystemPrompt();
     _systemPromptKnowledgeMtime = knowledgeMtime;
     _systemPromptLearnMtime = learnMtime;
+    _systemPromptVectorMtime = vectorMtime;
   }
   return _cachedSystemPrompt;
 }
@@ -186,6 +197,32 @@ class PerformanceTracker {
 }
 
 // ─── System Prompt Builder ───────────────────────────────────────────
+/**
+ * Load the top 20 most recent vector memory facts for system prompt injection.
+ * Uses synchronous file read (no embedding API call) — just the most recent entries.
+ */
+function buildVectorMemoryBlock(): string {
+  try {
+    const vectorFile = path.join(MEMORY_DIR, 'vector_index.json');
+    if (!fs.existsSync(vectorFile)) return '';
+    const index = JSON.parse(fs.readFileSync(vectorFile, 'utf8'));
+    if (!index.entries?.length) return '';
+
+    // Sort by updatedAt descending, take top 20
+    const sorted = [...index.entries]
+      .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 20);
+
+    const facts = sorted.map((e: any) => `  - ${e.key}: ${e.value}`).join('\n');
+
+    return `\n## 📋 Vector Memory — Key Facts (${index.entries.length} total stored)
+The following are the most recently updated facts from your persistent memory index. Use the manage_long_term_memory tool with 'recall' or 'search' to find more.
+${facts}`;
+  } catch {
+    return '';
+  }
+}
+
 function buildSystemPrompt(): string {
   const now = new Date();
   const timestamp = now.toLocaleString('en-US', {
@@ -293,6 +330,7 @@ You are a **Tier 3 MSP IT Technician** with deep expertise in:
 - **Posture**: Read-only by default. Never change configs, restart services, or kill processes without the user's approval unless explicitly instructed otherwise.
 ${knowledgeBlock}
 ${Learner.buildContextBlock()}
+${buildVectorMemoryBlock()}
 
 ---
 
@@ -602,18 +640,64 @@ export class Brain {
         const streamResult = await this.chat.sendMessageStream(payload);
         let fullResponse: any = null;
 
-        // If caller wants streaming, emit chunks as they arrive
-        if (onStreamChunk) {
-          for await (const chunk of streamResult.stream) {
-            const parts = chunk.candidates?.[0]?.content?.parts || [];
-            for (const part of parts) {
-              if (part.text) onStreamChunk(part.text);
+        // Collect raw stream parts to preserve thoughtSignature (camelCase)
+        // that the deprecated SDK's aggregateResponses() strips during streaming.
+        const rawStreamParts: any[] = [];
+
+        for await (const chunk of streamResult.stream) {
+          const parts = chunk.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            rawStreamParts.push(part);
+            // Debug: log when we capture a thoughtSignature from raw stream
+            if (part.functionCall && (part.thoughtSignature || part.thought_signature)) {
+              console.debug(`[Brain] Raw stream: captured thoughtSignature on ${part.functionCall.name}`);
             }
+            if (part.text && !part.thought && onStreamChunk) onStreamChunk(part.text);
           }
         }
 
         // Always await the full aggregated response for tool call detection
         fullResponse = await streamResult.response;
+
+        // ─── Restore thoughtSignature stripped by SDK aggregation ───
+        // The deprecated @google/generative-ai SDK's aggregateResponses() only copies
+        // text/functionCall/executableCode/codeExecutionResult, dropping Gemini 3's
+        // thoughtSignature and thought fields. We restore them from raw stream chunks.
+        const aggParts = fullResponse.candidates?.[0]?.content?.parts || [];
+        const rawFcParts = rawStreamParts.filter((p: any) => p.functionCall);
+        const rawThoughtParts = rawStreamParts.filter((p: any) => p.thought);
+        let fcIdx = 0;
+        for (const aggPart of aggParts) {
+          if (aggPart.functionCall && fcIdx < rawFcParts.length) {
+            const raw = rawFcParts[fcIdx++];
+            // Preserve thoughtSignature (API uses camelCase)
+            if (raw.thoughtSignature) aggPart.thoughtSignature = raw.thoughtSignature;
+            if (raw.thought_signature) aggPart.thought_signature = raw.thought_signature;
+            if (raw.thought) aggPart.thought = raw.thought;
+          }
+          if (aggPart.text !== undefined && !aggPart.functionCall) {
+            // Restore thought flag on thinking text parts
+            const matchingThought = rawThoughtParts.shift();
+            if (matchingThought) {
+              aggPart.thought = true;
+              if (matchingThought.thoughtSignature) aggPart.thoughtSignature = matchingThought.thoughtSignature;
+              if (matchingThought.thought_signature) aggPart.thought_signature = matchingThought.thought_signature;
+            }
+          }
+        }
+        // Propagate signature to ALL functionCall parts (API requires it on every one)
+        let sig: string | undefined;
+        for (const aggPart of aggParts) {
+          const s = aggPart.thoughtSignature || aggPart.thought_signature;
+          if (s) sig = s;
+          if (aggPart.functionCall && sig && !aggPart.thoughtSignature && !aggPart.thought_signature) {
+            aggPart.thoughtSignature = sig;
+          }
+        }
+        if (sig) {
+          console.debug(`[Brain] Restored thoughtSignature on ${aggParts.filter((p: any) => p.functionCall).length} functionCall part(s)`);
+        }
+
         return { response: fullResponse };
       } catch (e: any) {
         lastError = e.message || String(e);
@@ -757,6 +841,9 @@ need to do and ask the parent conversation to confirm before acting.`;
       if (totalTokens > 200_000) {
         console.log(`[Brain] Token count (${totalTokens}) exceeds 200K threshold. Auto-compacting...`);
 
+        // Flush key facts to vector memory before compaction destroys them
+        await this.flushToMemory(history);
+
         const summaryResult = await this.model.generateContent(
           `Summarize the following conversation history into a concise context block. Preserve: all user preferences, established workflows, active tasks, and any important decisions. Drop: tool call/response details, redundant exchanges, and small talk.\n\nHistory:\n${JSON.stringify(history.slice(0, -6), null, 2)}`
         );
@@ -785,6 +872,67 @@ need to do and ask the parent conversation to confirm before acting.`;
     } catch (e) {
       console.error('[Brain] Context compaction failed (non-fatal):', e);
       return false;
+    }
+  }
+
+  // ─── Pre-Compaction Memory Flush ────────────────────────────────────
+
+  private async flushToMemory(history: any[]): Promise<void> {
+    try {
+      // Extract just the text from recent history for analysis
+      const textExchanges = history
+        .filter((h: any) => (h.role === 'user' || h.role === 'model') && h.parts?.some((p: any) => p.text))
+        .map((h: any) => ({
+          role: h.role,
+          text: h.parts.filter((p: any) => p.text).map((p: any) => p.text).join('\n').substring(0, 500),
+        }))
+        .slice(-20);
+
+      if (textExchanges.length < 3) return;
+
+      const conversationText = textExchanges
+        .map((e: any) => `[${e.role.toUpperCase()}]: ${e.text}`)
+        .join('\n\n');
+
+      const extractionPrompt = `You are a memory extraction assistant. Analyze this conversation and extract the most important facts worth preserving permanently.
+
+Focus on:
+- User preferences and working style
+- MSP-specific context (clients, tools, workflows)
+- Decisions made and rationale
+- Technical configurations mentioned
+- Corrections to previous understanding
+
+Return a JSON array of objects: [{ "key": "short_label", "value": "concise fact" }]
+Return ONLY valid JSON, no other text. Maximum 10 facts.
+
+Conversation:
+${conversationText}`;
+
+      const flushModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await flushModel.generateContent(extractionPrompt);
+      const text = result.response.text().trim()
+        .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+      const facts: Array<{ key: string; value: string }> = JSON.parse(text);
+      let saved = 0;
+
+      for (const fact of facts) {
+        if (!fact.key || !fact.value) continue;
+        // Dedup check: skip facts that are already stored with high similarity
+        const isDup = await memoryIndex.isDuplicate(fact.key, fact.value);
+        if (!isDup) {
+          await memoryIndex.upsert(fact.key, fact.value, 'compaction_flush');
+          saved++;
+        }
+      }
+
+      if (saved > 0) {
+        console.log(`[Brain] Pre-compaction flush: saved ${saved} new facts (${facts.length - saved} duplicates skipped).`);
+      }
+    } catch (err) {
+      // Non-fatal — compaction continues regardless
+      console.error('[Brain] Pre-compaction flush failed:', err);
     }
   }
 
@@ -1451,16 +1599,19 @@ need to do and ask the parent conversation to confirm before acting.`;
       const allParts = response.candidates[0].content.parts;
       
       // ─── Thinking Signature Reconciliation (Fix for Gemini 3/Thinking Models) ───
-      // If the model turn includes a thought part with a signature, all subsequent 
-      // functionCall parts in the same turn MUST include that thought_signature.
+      // Gemini 3 returns thoughtSignature on the FIRST functionCall part only.
+      // All subsequent functionCall parts in the same turn MUST also include it
+      // when sent back in conversation history, or the API returns 400.
+      // Note: handled in sendWithFailover too, but this is a safety net for edge cases.
       let currentThoughtSignature: string | undefined;
       for (const part of allParts) {
-        if (part.thought && (part as any).thought_signature) {
-          currentThoughtSignature = (part as any).thought_signature;
+        const sig = (part as any).thoughtSignature || (part as any).thought_signature;
+        if (sig) {
+          currentThoughtSignature = sig;
         }
-        if (part.functionCall && currentThoughtSignature && !(part as any).thought_signature) {
-          console.debug(`[Brain] Attaching missing thought_signature to tool call: ${part.functionCall.name}`);
-          (part as any).thought_signature = currentThoughtSignature;
+        if (part.functionCall && currentThoughtSignature && !sig) {
+          console.debug(`[Brain] Reconciling thoughtSignature on tool call: ${part.functionCall.name}`);
+          (part as any).thoughtSignature = currentThoughtSignature;
         }
       }
 

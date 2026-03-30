@@ -24,7 +24,7 @@ PersonalClaw is a **local-first AI automation platform** for Windows. It connect
 - Mobile: React Native / Expo SDK 55 (Android)
 - Browser Control: Playwright + Chrome Extension Relay + Native Chrome CDP
 - Remote Access: Cloudflare Tunnel (`https://api.utilization-tracker.online`)
-- Version: 12.11.1
+- Version: 12.12.1
 - Author: Scout Kalra
 
 ---
@@ -97,6 +97,7 @@ PersonalClaw/
 │   │   ├── audit.ts                # JSONL audit logging with rotation
 │   │   ├── sessions.ts             # Session save/restore/search
 │   │   ├── learner.ts              # Self-learning engine (async analysis)
+│   │   ├── memory-index.ts         # Vector memory index (Gemini embeddings, hybrid search)
 │   │   ├── terminal-logger.ts      # Console tee to daily rolling file
 │   │   └── telegram-brain.ts       # Telegram bot interface (isolated Brain)
 │   └── skills/
@@ -162,8 +163,9 @@ PersonalClaw/
 │   ├── Post_content.txt            # Tweet content buffer
 │   └── launch_persistent_browser.ps1
 ├── memory/                         # Persistent storage
-│   ├── long_term_knowledge.json    # Learned user preferences
-│   ├── self_learned.json           # Auto-learned patterns
+│   ├── long_term_knowledge.json    # Learned user preferences (legacy, still used for cache)
+│   ├── self_learned.json           # Auto-learned patterns (structured: shorthand, style, intents)
+│   ├── vector_index.json           # Vector memory index (embeddings + facts, atomic write)
 │   ├── learning_log.json           # Learning event history
 │   ├── scheduled_jobs.json         # Active cron jobs
 │   ├── todos.json                  # All todos + recurring templates (atomic write)
@@ -321,16 +323,20 @@ If the primary model returns 404, 503, 429, or auth error, the Brain automatical
 The system prompt is delivered via Gemini's native **`systemInstruction`** field (not injected as conversation history), saving ~3K tokens per turn. It is dynamically assembled from:
 1. **Core identity** — personality, reasoning framework (Understand → Plan → Act → Verify)
 2. **Self-learned knowledge** — user profile, communication style, intent patterns, domain terms (from `learner.ts`)
-3. **Tool usage guides** — best practices and anti-patterns per skill
-4. **Safety guardrails** — no destructive commands without confirmation, no credential leaking
+3. **Vector memory facts** — top 20 most recent facts from the vector index (from `memory-index.ts`, no embedding API call — sorted by `updatedAt`)
+4. **Tool usage guides** — best practices and anti-patterns per skill
+5. **Safety guardrails** — no destructive commands without confirmation, no credential leaking
 
-The system prompt is **cached** at module level and only rebuilt when `long_term_knowledge.json` or `self_learned.json` file modification timestamps change. Call `invalidateSystemPromptCache()` to force a rebuild.
+The system prompt is **cached** at module level and only rebuilt when `long_term_knowledge.json`, `self_learned.json`, or `vector_index.json` file modification timestamps change. Call `invalidateSystemPromptCache()` to force a rebuild.
 
 For org agents, the system prompt is replaced with a **persona injection** containing: org mission, agent role/personality/responsibilities, colleague list, task queue, memory, shared memory, human comments on files.
 
 ### Streaming
 
 All Gemini calls use **`sendMessageStream()`** instead of `sendMessage()`. Text tokens are emitted in real-time via the `onUpdate` callback, which the Socket.IO handler forwards to the dashboard as `response:stream` events. This reduces perceived latency from seconds to ~1s time-to-first-token.
+
+**Thought Signature Preservation (Gemini 3 Patch):**
+Due to an SDK limitation where `thoughtSignature` and `thought` fields are dropped during stream aggregation, the Brain captures raw stream chunks before aggregation. These fields are manually re-attached to the aggregated response parts to prevent `400 Bad Request` errors on subsequent tool-calling turns.
 
 ### Tool Loop
 
@@ -344,7 +350,11 @@ All Gemini calls use **`sendMessageStream()`** instead of `sendMessage()`. Text 
 
 ### Context Compaction
 
-When conversation history exceeds **200K tokens** (checked every 10 turns), the Brain summarizes older messages into a single context recovery message, preserving the most recent 6 interactions. This prevents runaway token growth that slows every request.
+When conversation history exceeds **200K tokens** (checked every 10 turns), the Brain:
+1. **Flushes key facts** to the vector memory index via `flushToMemory()` — extracts up to 10 facts using `gemini-2.5-flash`, deduplicates against existing entries (>0.9 cosine similarity = skip), and upserts as `compaction_flush` source.
+2. **Summarizes** older messages into a single context recovery message, preserving the most recent 6 interactions.
+
+This ensures important facts survive compaction in durable vector memory, not just in the compressed summary.
 
 ### Performance Optimizations
 
@@ -443,11 +453,16 @@ Read/write system clipboard via `clipboardy`. **Exclusive lock** on `clipboard`.
 
 ### 6. Memory — `manage_long_term_memory`
 
+Backed by the **Vector Memory Index** (`memory/vector_index.json`). Uses Gemini `gemini-embedding-001` for semantic embeddings. Hybrid search: 70% cosine similarity + 30% keyword overlap.
+
 | Action | Lock | Behavior |
 |--------|------|----------|
-| `learn` | Write (`memory`) | Store key-value in `long_term_knowledge.json` |
-| `recall` | Read | Retrieve by key or get all |
-| `forget` | Write | Delete key |
+| `learn` | Write (`memory_index`) | Upsert key-value into vector index with embedding |
+| `recall` | Read | **Semantic search** — "what do I know about ConnectWise" works |
+| `recall_exact` | Read | Exact key lookup (backwards compat) |
+| `forget` | Write | Delete by key |
+| `search` | Read | Explicit semantic search with `top_k` param |
+| `list` | Read | Paginated entry list (for dashboard) |
 
 ### 7. Browser — `browser`
 
@@ -892,7 +907,57 @@ After conversations end, the Learner asynchronously analyzes the history using `
 - **Corrections** — mistakes and lessons learned
 - **Domain knowledge** — specialized terminology
 
-All learned data persisted to `memory/self_learned.json` and injected into every Brain's system prompt.
+**Structured patterns** (shorthand maps, intent patterns, communication style, workflow patterns) are persisted to `memory/self_learned.json` and injected into every Brain's system prompt via `Learner.buildContextBlock()`.
+
+**Discrete facts** (user profile notes, domain knowledge, corrections, raw insights) are also upserted into the **vector memory index** (`memory/vector_index.json`) with `source: 'learner'`, making them searchable via semantic recall.
+
+---
+
+## Vector Memory Index
+
+**File:** `src/core/memory-index.ts`
+
+A unified semantic + keyword memory engine that stores facts as key-value entries with Gemini embeddings. This is the **fact store** — discrete, durable knowledge that survives context compactions and server restarts.
+
+### Architecture
+
+| Component | Choice | Reason |
+|-----------|--------|--------|
+| Storage | Local JSON (`memory/vector_index.json`) | TypeScript-native, no native binaries, fits local-first principle |
+| Embeddings | Gemini `text-embedding-004` (768-dim) | Already have API key, consistent with stack |
+| Search | Hybrid: 70% cosine similarity + 30% keyword overlap | Pure vector misses exact matches; pure keyword misses semantics |
+| Write safety | Atomic (tmp → rename) | Consistent with todos.json pattern |
+| Concurrency | `memory_index` ReadWriteLock (10s timeout) | Prevents concurrent write corruption |
+
+### Entry Schema
+
+Each entry has: `id`, `key`, `value`, `source` (manual/learner/compaction_flush), `embedding` (768-dim float[]), `createdAt`, `updatedAt`, optional `tags`.
+
+### Three Write Sources
+
+1. **`manual`** — User explicitly stores a fact via `manage_long_term_memory` → `learn`
+2. **`learner`** — Learner extracts discrete facts (profile notes, domain terms, corrections) after conversation analysis
+3. **`compaction_flush`** — Brain extracts key facts before context compaction (200K token threshold), with dedup check (>0.9 cosine similarity = skip)
+
+### System Prompt Injection
+
+Two complementary sections are injected into every Brain's system prompt:
+- **Learner context block** (`Learner.buildContextBlock()`) — structured patterns: shorthand maps, intent patterns, communication style, workflow patterns
+- **Vector memory block** (`buildVectorMemoryBlock()`) — top 20 most recent facts by `updatedAt`, loaded from disk (no embedding API call)
+
+### Human Correction Surface
+
+- **Export**: `GET /api/memory/export` → human-readable Markdown with ID comments
+- **Import**: `POST /api/memory/import` → parse edited Markdown, re-embed only changed entries
+- On-demand workflow, no runtime sync complexity
+
+### Migration
+
+On first startup (when `vector_index.json` doesn't exist), `migrateFromLegacy()` runs:
+- Reads `long_term_knowledge.json` → upserts as `manual` entries
+- Reads `self_learned.json` → extracts facts only (profile notes, domain terms, corrections, raw insights) as `learner` entries
+- Uses `batchEmbedContents` for efficiency (falls back to sequential on failure)
+- Legacy files are **not deleted** — they still serve as system prompt cache triggers
 
 ---
 
@@ -944,6 +1009,15 @@ All learned data persisted to `memory/self_learned.json` and injected into every
 | POST | `/api/todos/reopen` | Uncheck completed todo `{id}` |
 | POST | `/api/todos/subtask` | Add subtask `{parentId, title, ...}` |
 | DELETE | `/api/todos/:id` | Delete todo and its subtasks |
+
+### Memory
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/memory/export` | Download memory as Markdown file |
+| POST | `/api/memory/import` | Import corrected Markdown `{markdown}` |
+| GET | `/api/memory/search?q=&k=` | Semantic search (returns scored results) |
+| GET | `/api/memory/list?page=&pageSize=` | Paginated entry list |
+| DELETE | `/api/memory/:id` | Delete entry by ID |
 
 ### System
 | Method | Path | Purpose |
@@ -1209,4 +1283,4 @@ export const skills: Skill[] = [ ..., mySkill ];
 
 ---
 
-*Last updated: 2026-03-29 — PersonalClaw v12.11.1*
+*Last updated: 2026-03-30 — PersonalClaw v12.12.0*
